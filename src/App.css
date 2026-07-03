@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+html, body {
+  overscroll-behavior: none;
+}
+
+
+/* ============================================================
+   PRINT / SAVE-AS-PDF STYLES
+   When window.print() is called, only #receipt-print-area
+   is visible. Everything else is hidden.
+   ============================================================ */
+@media print {
+  /* Hide ALL body children */
+  body > * {
+    display: none !important;
+  }
+
+  /* Show only the receipt print container */
+  #receipt-print-area {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  /* Force white backgrounds and black text on all children */
+  #receipt-print-area * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 0.5in;
+    size: A4 portrait;
+  }
+}
+
+/* ============================================================
+   RECEIPT TEMPLATE — visible only during print
+   Hidden at all other times via inline style
+   ============================================================ */
+.receipt-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-size: 72px;
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  letter-spacing: 8px;
+}
