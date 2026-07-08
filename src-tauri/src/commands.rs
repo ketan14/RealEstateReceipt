@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, Row};
 use tauri::{Manager, State};
 
+//use crate::towers::{self, Tower};
+//use crate::units::{self, Unit};
 // Database State wrapper
 pub struct DbState {
     pub pool: SqlitePool,
@@ -23,7 +25,7 @@ pub struct Tower {
     pub id: i64,
     pub project_id: i64,
     pub name: String,
-    pub units: Vec<Unit>,
+    pub units: Option<Vec<Unit>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,7 +33,7 @@ pub struct Project {
     pub id: i64,
     pub name: String,
     pub location: String,
-    pub towers: Vec<Tower>,
+    pub towers: Option<Vec<Tower>>, // optional towers
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -97,7 +99,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
             .await
             .map_err(|e| format!("Failed to fetch towers: {}", e))?;
 
-        let mut towers = Vec::new();
+        let mut towers: Vec<Tower> = Vec::new();
         for t_row in towers_rows {
             let t_id: i64 = t_row.get("id");
             let t_name: String = t_row.get("name");
@@ -111,7 +113,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
             .await
             .map_err(|e| format!("Failed to fetch units: {}", e))?;
 
-            let mut units = Vec::new();
+            let mut units: Vec<Unit> = Vec::new();
             for u_row in units_rows {
                 units.push(Unit {
                     id: u_row.get("id"),
@@ -128,7 +130,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
                 id: t_id,
                 project_id: p_id,
                 name: t_name,
-                units,
+                units: Some(units),
             });
         }
 
@@ -136,7 +138,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
             id: p_id,
             name: p_name,
             location: p_location,
-            towers,
+            towers: Some(towers),
         });
     }
 
@@ -572,3 +574,217 @@ pub async fn update_unit_status(
     Ok(())
 }
 
+// CREATE
+#[tauri::command]
+pub async fn create_project(state: State<'_, DbState>, name: String, location: String) -> Result<i64, String> {
+    let pool = &state.pool;
+    let rec = sqlx::query("INSERT INTO projects (name, location) VALUES (?, ?)")
+        .bind(name)
+        .bind(location)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to insert project: {}", e))?;
+
+    Ok(rec.last_insert_rowid())
+}
+
+// READ
+#[tauri::command]
+pub async fn get_projects(state: State<'_, DbState>) -> Result<Vec<Project>, String> {
+    let pool = &state.pool;
+    let rows = sqlx::query("SELECT id, name, location FROM projects ORDER BY name")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Failed to fetch projects: {}", e))?;
+
+    Ok(rows.into_iter().map(|row| Project {
+        id: row.get("id"),
+        name: row.get("name"),
+        location: row.get("location"),
+        towers: None, // empty list until you fetch towers
+    }).collect())
+}
+
+// UPDATE
+#[tauri::command]
+pub async fn update_project(state: State<'_, DbState>, id: i64, name: String, location: String) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query("UPDATE projects SET name = ?, location = ? WHERE id = ?")
+        .bind(name)
+        .bind(location)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to update project: {}", e))?;
+    Ok(())
+}
+
+// DELETE
+#[tauri::command]
+pub async fn delete_project(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query("DELETE FROM projects WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to delete project: {}", e))?;
+    Ok(())
+}
+
+
+// CREATE Tower
+#[tauri::command]
+pub async fn create_tower(state: State<'_, DbState>, project_id: i64, name: String) -> Result<i64, String> {
+    let pool = &state.pool;
+    let rec = sqlx::query("INSERT INTO towers (project_id, name) VALUES (?, ?)")
+        .bind(project_id)
+        .bind(name)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to insert tower: {}", e))?;
+
+    Ok(rec.last_insert_rowid())
+}
+
+// READ Towers by project
+#[tauri::command]
+pub async fn get_towers(state: State<'_, DbState>, project_id: i64) -> Result<Vec<Tower>, String> {
+    let pool = &state.pool;
+    let rows = sqlx::query("SELECT id, project_id, name FROM towers WHERE project_id = ? ORDER BY name")
+        .bind(project_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Failed to fetch towers: {}", e))?;
+
+    Ok(rows.into_iter().map(|row| Tower {
+        id: row.get("id"),
+        project_id: row.get("project_id"),
+        name: row.get("name"),
+        units: None, // empty list until you fetch units
+    }).collect())
+}
+
+// UPDATE Tower
+#[tauri::command]
+pub async fn update_tower(state: State<'_, DbState>, id: i64, project_id: i64, name: String) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query("UPDATE towers SET project_id = ?, name = ? WHERE id = ?")
+        .bind(project_id)
+        .bind(name)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to update tower: {}", e))?;
+    Ok(())
+}
+
+// DELETE Tower
+#[tauri::command]
+pub async fn delete_tower(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query("DELETE FROM towers WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to delete tower: {}", e))?;
+    Ok(())
+}
+ 
+// CREATE Unit
+#[tauri::command]
+pub async fn create_unit(
+    state: State<'_, DbState>,
+    project_id: i64,
+    tower_id: i64,
+    unit_number: String,
+    status: String,
+    base_price: f64,
+    configuration: String,
+) -> Result<i64, String> {
+    let pool = &state.pool;
+    let rec = sqlx::query(
+        "INSERT INTO units (project_id, tower_id, unit_number, status, base_price, configuration)
+         VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .bind(project_id)
+    .bind(tower_id)
+    .bind(unit_number)
+    .bind(status)
+    .bind(base_price)
+    .bind(configuration)
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to insert unit: {}", e))?;
+
+    Ok(rec.last_insert_rowid())
+}
+
+// READ Units by project
+#[tauri::command]
+pub async fn get_units(state: State<'_, DbState>, project_id: i64) -> Result<Vec<Unit>, String> {
+    println!("Message from Rust: {}", project_id);
+    let pool = &state.pool;
+    let rows = sqlx::query(
+        "SELECT id, project_id, tower_id, unit_number, status, base_price, configuration
+         FROM units
+         WHERE project_id = ?
+         ORDER BY unit_number"
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch units: {}", e))?;
+
+    Ok(rows.into_iter().map(|row| Unit {
+        id: row.get("id"),
+        project_id: row.get("project_id"),
+        tower_id: row.get("tower_id"),
+        unit_number: row.get("unit_number"),
+        status: row.get("status"),
+        base_price: row.get("base_price"),
+        configuration: row.get("configuration"),
+    }).collect())
+}
+
+// UPDATE Unit
+#[tauri::command]
+pub async fn update_unit(
+    state: State<'_, DbState>,
+    id: i64,
+    project_id: i64,
+    tower_id: i64,
+    unit_number: String,
+    status: String,
+    base_price: f64,
+    configuration: String,
+) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query(
+        "UPDATE units
+         SET project_id = ?, tower_id = ?, unit_number = ?, status = ?, base_price = ?, configuration = ?
+         WHERE id = ?"
+    )
+    .bind(project_id)
+    .bind(tower_id)
+    .bind(unit_number)
+    .bind(status)
+    .bind(base_price)
+    .bind(configuration)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to update unit: {}", e))?;
+    Ok(())
+}
+
+// DELETE Unit
+#[tauri::command]
+pub async fn delete_unit(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let pool = &state.pool;
+    sqlx::query("DELETE FROM units WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to delete unit: {}", e))?;
+    Ok(())
+}

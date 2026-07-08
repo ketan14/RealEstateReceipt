@@ -1,6 +1,5 @@
 mod db;
 mod commands;
-
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -9,14 +8,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            // Perform synchronous block-on for database initialization during setup
             let pool = tauri::async_runtime::block_on(async move {
                 db::init_db(&handle)
                     .await
                     .expect("Critical: Database initialization failed")
             });
 
-            // Store the database state in Tauri's resource manager
             app.manage(commands::DbState { pool });
             Ok(())
         })
@@ -27,7 +24,24 @@ pub fn run() {
             commands::open_receipt_html,
             commands::get_booking_details_by_unit,
             commands::create_additional_receipt,
-            commands::update_unit_status
+            commands::update_unit_status,
+            // existing commands...
+            commands::create_project,
+            commands::get_projects,
+            commands::update_project,
+            commands::delete_project,
+
+            // tower commands
+            commands::create_tower,
+            commands::get_towers,
+            commands::update_tower,
+            commands::delete_tower,
+
+            // unit commands
+            commands::create_unit,
+            commands::get_units,
+            commands::update_unit,
+            commands::delete_unit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

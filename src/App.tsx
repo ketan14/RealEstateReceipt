@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Project, Unit, BookingPayload, ReceiptHistoryItem, BookingDetails, GroupedReceipt } from "./types";
 import "./App.css";
+import AdminDashboard from "./Components/AdminMainComponent";
 
 function App() {
   // Navigation & View State
-  const [activeTab, setActiveTab] = useState<"explorer" | "history">("explorer");
+  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin">("explorer");
   const [projects, setProjects] = useState<Project[]>([]);
   const [receipts, setReceipts] = useState<ReceiptHistoryItem[]>([]);
   const [uniqueCombinations, setUniqueCombinations] = useState<ReceiptHistoryItem[]>([]);
@@ -52,6 +53,7 @@ function App() {
     setErrorMsg(null);
     try {
       const propertyMap: Project[] = await invoke("get_property_map");
+      console.log("Loaded property map:", propertyMap);
       setProjects(propertyMap);
       const history: ReceiptHistoryItem[] = await invoke("get_receipt_history");
 
@@ -590,6 +592,18 @@ function App() {
           >
             Receipt Ledger
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("admin");
+              setSelectedUnit(null);
+            }}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === "admin"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              : "text-slate-400 hover:text-slate-200"
+              }`}
+          >
+            Admin
+          </button>
         </div>
       </header>
 
@@ -667,7 +681,7 @@ function App() {
 
                     {/* Towers */}
                     <div className="space-y-4">
-                      {project.towers.map((tower) => (
+                      {project?.towers?.map((tower) => (
                         <div key={tower.id} className="p-4 rounded-xl bg-slate-950/50 border border-slate-800/60 space-y-3">
                           <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{tower.name}</h4>
 
@@ -928,6 +942,10 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+        {/* Tab 3: Admin */}
+        {activeTab === "admin" && !loading && (
+            <AdminDashboard />
         )}
       </main>
 
@@ -1480,7 +1498,7 @@ function App() {
                         <button
                           type="button"
                           onClick={async () => {
-                            if (confirm(`Mark Unit ${selectedUnit.unit_number} as Registered?`)) {
+                            //if (confirm(`Mark Unit ${selectedUnit.unit_number} as Registered?`)) {
                               try {
                                 setLoading(true);
                                 await invoke("update_unit_status", { unitId: selectedUnit.id, status: "Registered" });
@@ -1504,7 +1522,7 @@ function App() {
                               } finally {
                                 setLoading(false);
                               }
-                            }
+                            //}
                           }}
                           className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-semibold shadow-lg shadow-purple-600/30 transition-all text-xs flex items-center gap-1.5"
                         >
