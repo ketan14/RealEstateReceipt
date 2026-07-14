@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, Row};
 use tauri::{Manager, State};
+use chrono::{NaiveDate, Datelike};
 
 //use crate::towers::{self, Tower};
 //use crate::units::{self, Unit};
@@ -33,7 +34,19 @@ pub struct Project {
     pub id: i64,
     pub name: String,
     pub location: String,
+    pub rera_number: Option<String>,
+    pub rera_website_url: Option<String>,
     pub towers: Option<Vec<Tower>>, // optional towers
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BookingCustomerInfo {
+    pub customer_id: i64,
+    pub role: String,
+    pub name: String,
+    pub phone: String,
+    pub pan_number: String,
+    pub aadhaar_number: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -48,6 +61,7 @@ pub struct Customer {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BookingPayload {
     pub customer: Customer,
+    pub co_applicants: Option<Vec<Customer>>,
     pub unit_id: i64,
     pub booking_date: String,
     pub agreed_sale_value: f64,
@@ -74,6 +88,73 @@ pub struct ReceiptHistoryItem {
     pub unit_number: String,
     pub project_name: String,
     pub tower_name: String,
+    pub rera_number: Option<String>,
+    pub co_applicants: Option<Vec<BookingCustomerInfo>>,
+}
+
+// ─── Financial Year Helper ──────────────────────────────────────────────────
+/// Derives the Indian financial year string (e.g. "2026-27") from a date.
+/// Indian FY runs April 1 to March 31.
+fn get_financial_year(date_str: &str) -> String {
+    let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .unwrap_or_else(|_| chrono::Local::now().date_naive());
+    let year = date.year();
+    let month = date.month();
+    if month >= 4 {
+        // April onwards → FY is year to year+1
+        format!("{}-{}", year, (year + 1) % 100)
+    } else {
+        // Jan–March → FY is year-1 to year
+        format!("{}-{}", year - 1, year % 100)
+    }
+}
+
+/// Generate the next receipt number for a given project and date.
+/// Format: `{PREFIX}/{PROJECT_CODE}/{FY}/{SEQUENCE}` e.g. `REC/PRJ-1/2026-27/00012`
+async fn generate_receipt_number(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    project_id: i64,
+    date_str: &str,
+) -> Result<String, String> {
+    let fy = get_financial_year(date_str);
+
+    // Upsert: create row if missing, then increment
+    sqlx::query(
+        r#"
+        INSERT INTO receipt_sequences (project_id, financial_year, last_number)
+        VALUES (?, ?, 0)
+        ON CONFLICT(project_id, financial_year) DO NOTHING;
+        "#
+    )
+    .bind(project_id)
+    .bind(&fy)
+    .execute(&mut **tx)
+    .await
+    .map_err(|e| format!("Failed to init receipt sequence: {}", e))?;
+
+    // Atomically increment and retrieve the new number
+    sqlx::query(
+        "UPDATE receipt_sequences SET last_number = last_number + 1 WHERE project_id = ? AND financial_year = ?"
+    )
+    .bind(project_id)
+    .bind(&fy)
+    .execute(&mut **tx)
+    .await
+    .map_err(|e| format!("Failed to increment receipt sequence: {}", e))?;
+
+    let row = sqlx::query(
+        "SELECT last_number, prefix FROM receipt_sequences WHERE project_id = ? AND financial_year = ?"
+    )
+    .bind(project_id)
+    .bind(&fy)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|e| format!("Failed to read receipt sequence: {}", e))?;
+
+    let seq_num: i64 = row.get("last_number");
+    let prefix: String = row.get("prefix");
+
+    Ok(format!("{}/PRJ-{}/{}/{:05}", prefix, project_id, fy, seq_num))
 }
 
 #[tauri::command]
@@ -81,7 +162,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
     let pool = &state.pool;
 
     // 1. Fetch all projects
-    let projects_rows = sqlx::query("SELECT id, name, location FROM projects ORDER BY name")
+    let projects_rows = sqlx::query("SELECT id, name, location, rera_number, rera_website_url FROM projects ORDER BY name")
         .fetch_all(pool)
         .await
         .map_err(|e| format!("Failed to fetch projects: {}", e))?;
@@ -91,6 +172,8 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
         let p_id: i64 = p_row.get("id");
         let p_name: String = p_row.get("name");
         let p_location: String = p_row.get("location");
+        let p_rera: Option<String> = p_row.get("rera_number");
+        let p_rera_url: Option<String> = p_row.get("rera_website_url");
 
         // 2. Fetch towers for this project
         let towers_rows = sqlx::query("SELECT id, name FROM towers WHERE project_id = ? ORDER BY name")
@@ -138,6 +221,8 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
             id: p_id,
             name: p_name,
             location: p_location,
+            rera_number: p_rera,
+            rera_website_url: p_rera_url,
             towers: Some(towers),
         });
     }
@@ -234,6 +319,60 @@ pub async fn create_booking_and_receipt(
 
     let booking_id = booking_result.last_insert_rowid();
 
+    // 3b. Insert into booking_customers junction table (primary buyer)
+    sqlx::query(
+        "INSERT INTO booking_customers (booking_id, customer_id, role) VALUES (?, ?, 'Primary')"
+    )
+    .bind(booking_id)
+    .bind(customer_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| format!("Failed to link primary customer to booking: {}", e))?;
+
+    // 3c. Insert co-applicants if provided
+    if let Some(co_applicants) = &payload.co_applicants {
+        for co_app in co_applicants {
+            // Look up or create the co-applicant customer record
+            let co_id: i64 = if let Some(id) = co_app.id {
+                id
+            } else {
+                let existing: Option<i64> = sqlx::query_scalar(
+                    "SELECT id FROM customers WHERE pan_number = ?"
+                )
+                .bind(&co_app.pan_number)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| e.to_string())?;
+
+                match existing {
+                    Some(id) => id,
+                    None => {
+                        let result = sqlx::query(
+                            "INSERT INTO customers (name, phone, pan_number, aadhaar_number) VALUES (?, ?, ?, ?)"
+                        )
+                        .bind(&co_app.name)
+                        .bind(&co_app.phone)
+                        .bind(&co_app.pan_number)
+                        .bind(&co_app.aadhaar_number)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| format!("Failed to insert co-applicant: {}", e))?;
+                        result.last_insert_rowid()
+                    }
+                }
+            };
+
+            sqlx::query(
+                "INSERT OR IGNORE INTO booking_customers (booking_id, customer_id, role) VALUES (?, ?, 'Co-Applicant')"
+            )
+            .bind(booking_id)
+            .bind(co_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Failed to link co-applicant to booking: {}", e))?;
+        }
+    }
+
     // 4. Update Unit Status to 'Booked'
     sqlx::query("UPDATE units SET status = 'Booked' WHERE id = ?")
         .bind(payload.unit_id)
@@ -241,14 +380,17 @@ pub async fn create_booking_and_receipt(
         .await
         .map_err(|e| format!("Failed to update unit status: {}", e))?;
 
-    // 5. Generate Receipt Number
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM receipts")
+    // 5. Get project_id for this unit (needed for receipt numbering)
+    let unit_project_id: i64 = sqlx::query_scalar("SELECT project_id FROM units WHERE id = ?")
+        .bind(payload.unit_id)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| e.to_string())?;
-    let receipt_number = format!("REC-{:05}", count + 1);
+        .map_err(|e| format!("Failed to get unit project: {}", e))?;
 
-    // 6. Create Receipt
+    // 6. Generate Receipt Number (configurable, per-project, per-FY)
+    let receipt_number = generate_receipt_number(&mut tx, unit_project_id, &payload.booking_date).await?;
+
+    // 7. Create Receipt
     sqlx::query(
         "INSERT INTO receipts (booking_id, receipt_number, amount, payment_mode, transaction_ref, date) VALUES (?, ?, ?, ?, ?, ?)"
     )
@@ -292,10 +434,12 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             c.aadhaar_number as customer_aadhaar,
             u.unit_number,
             p.name as project_name,
-            t.name as tower_name
+            t.name as tower_name,
+            p.rera_number
         FROM receipts r
         JOIN bookings b ON r.booking_id = b.id
-        JOIN customers c ON b.customer_id = c.id
+        JOIN booking_customers bc ON bc.booking_id = b.id AND bc.role = 'Primary'
+        JOIN customers c ON bc.customer_id = c.id
         JOIN units u ON b.unit_id = u.id
         JOIN projects p ON u.project_id = p.id
         JOIN towers t ON u.tower_id = t.id
@@ -308,6 +452,41 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
 
     let mut history = Vec::new();
     for row in rows {
+        let booking_id: i64 = row.get("booking_id");
+
+        // Fetch all co-applicants for this booking
+        let co_app_rows = sqlx::query(
+            r#"
+            SELECT 
+                bc.customer_id,
+                bc.role,
+                c.name,
+                c.phone,
+                c.pan_number,
+                c.aadhaar_number
+            FROM booking_customers bc
+            JOIN customers c ON bc.customer_id = c.id
+            WHERE bc.booking_id = ?
+            ORDER BY bc.role ASC, c.name ASC
+            "#
+        )
+        .bind(booking_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Failed to query co-applicants for receipt: {}", e))?;
+
+        let mut co_applicants = Vec::new();
+        for ca_row in co_app_rows {
+            co_applicants.push(BookingCustomerInfo {
+                customer_id: ca_row.get("customer_id"),
+                role: ca_row.get("role"),
+                name: ca_row.get("name"),
+                phone: ca_row.get("phone"),
+                pan_number: ca_row.get("pan_number"),
+                aadhaar_number: ca_row.get("aadhaar_number"),
+            });
+        }
+
         history.push(ReceiptHistoryItem {
             receipt_id: row.get("receipt_id"),
             receipt_number: row.get("receipt_number"),
@@ -315,7 +494,7 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             payment_mode: row.get("payment_mode"),
             transaction_ref: row.get("transaction_ref"),
             date: row.get("date"),
-            booking_id: row.get("booking_id"),
+            booking_id,
             agreed_sale_value: row.get("agreed_sale_value"),
             booking_date: row.get("booking_date"),
             customer_name: row.get("customer_name"),
@@ -325,6 +504,8 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             unit_number: row.get("unit_number"),
             project_name: row.get("project_name"),
             tower_name: row.get("tower_name"),
+            rera_number: row.get("rera_number"),
+            co_applicants: Some(co_applicants),
         });
     }
 
@@ -391,6 +572,7 @@ pub struct BookingDetails {
     pub booking_date: String,
     pub unit_id: i64,
     pub receipts: Vec<ReceiptItem>,
+    pub co_applicants: Vec<BookingCustomerInfo>,
 }
 
 #[tauri::command]
@@ -401,6 +583,7 @@ pub async fn get_booking_details_by_unit(
     let pool = &state.pool;
 
     // Fetch the active/most recent booking for this unit
+    // Join through booking_customers junction table for the primary buyer
     let booking_row = sqlx::query(
         r#"
         SELECT 
@@ -412,7 +595,8 @@ pub async fn get_booking_details_by_unit(
             b.agreed_sale_value,
             b.booking_date
         FROM bookings b
-        JOIN customers c ON b.customer_id = c.id
+        JOIN booking_customers bc ON bc.booking_id = b.id AND bc.role = 'Primary'
+        JOIN customers c ON bc.customer_id = c.id
         WHERE b.unit_id = ?
         ORDER BY b.id DESC
         LIMIT 1
@@ -465,6 +649,39 @@ pub async fn get_booking_details_by_unit(
                 });
             }
 
+            // Fetch all co-applicants for this booking
+            let co_app_rows = sqlx::query(
+                r#"
+                SELECT 
+                    bc.customer_id,
+                    bc.role,
+                    c.name,
+                    c.phone,
+                    c.pan_number,
+                    c.aadhaar_number
+                FROM booking_customers bc
+                JOIN customers c ON bc.customer_id = c.id
+                WHERE bc.booking_id = ?
+                ORDER BY bc.role ASC, c.name ASC
+                "#
+            )
+            .bind(booking_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Failed to query co-applicants: {}", e))?;
+
+            let mut co_applicants = Vec::new();
+            for ca_row in co_app_rows {
+                co_applicants.push(BookingCustomerInfo {
+                    customer_id: ca_row.get("customer_id"),
+                    role: ca_row.get("role"),
+                    name: ca_row.get("name"),
+                    phone: ca_row.get("phone"),
+                    pan_number: ca_row.get("pan_number"),
+                    aadhaar_number: ca_row.get("aadhaar_number"),
+                });
+            }
+
             Ok(Some(BookingDetails {
                 id: booking_id,
                 customer_name,
@@ -475,6 +692,7 @@ pub async fn get_booking_details_by_unit(
                 booking_date,
                 unit_id,
                 receipts,
+                co_applicants,
             }))
         }
         None => Ok(None)
@@ -501,12 +719,17 @@ pub async fn create_additional_receipt(
         .await
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
-    // 1. Get agreed sale value
-    let agreed_sale_value: f64 = sqlx::query_scalar("SELECT agreed_sale_value FROM bookings WHERE id = ?")
-        .bind(booking_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| format!("Booking not found or query failed: {}", e))?;
+    // 1. Get agreed sale value and unit's project_id
+    let booking_row = sqlx::query(
+        "SELECT b.agreed_sale_value, u.project_id FROM bookings b JOIN units u ON b.unit_id = u.id WHERE b.id = ?"
+    )
+    .bind(booking_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| format!("Booking not found or query failed: {}", e))?;
+
+    let agreed_sale_value: f64 = booking_row.get("agreed_sale_value");
+    let unit_project_id: i64 = booking_row.get("project_id");
 
     // 2. Get total amount paid so far
     let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0.0) FROM receipts WHERE booking_id = ?")
@@ -524,12 +747,8 @@ pub async fn create_additional_receipt(
         ));
     }
 
-    // 3. Generate Receipt Number
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM receipts")
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
-    let receipt_number = format!("REC-{:05}", count + 1);
+    // 3. Generate Receipt Number (configurable, per-project, per-FY)
+    let receipt_number = generate_receipt_number(&mut tx, unit_project_id, &date).await?;
 
     // 4. Create Receipt
     sqlx::query(
@@ -576,14 +795,24 @@ pub async fn update_unit_status(
 
 // CREATE
 #[tauri::command]
-pub async fn create_project(state: State<'_, DbState>, name: String, location: String) -> Result<i64, String> {
+pub async fn create_project(
+    state: State<'_, DbState>,
+    name: String,
+    location: String,
+    rera_number: Option<String>,
+    rera_website_url: Option<String>,
+) -> Result<i64, String> {
     let pool = &state.pool;
-    let rec = sqlx::query("INSERT INTO projects (name, location) VALUES (?, ?)")
-        .bind(name)
-        .bind(location)
-        .execute(pool)
-        .await
-        .map_err(|e| format!("Failed to insert project: {}", e))?;
+    let rec = sqlx::query(
+        "INSERT INTO projects (name, location, rera_number, rera_website_url) VALUES (?, ?, ?, ?)"
+    )
+    .bind(&name)
+    .bind(&location)
+    .bind(&rera_number)
+    .bind(&rera_website_url)
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to insert project: {}", e))?;
 
     Ok(rec.last_insert_rowid())
 }
@@ -592,7 +821,7 @@ pub async fn create_project(state: State<'_, DbState>, name: String, location: S
 #[tauri::command]
 pub async fn get_projects(state: State<'_, DbState>) -> Result<Vec<Project>, String> {
     let pool = &state.pool;
-    let rows = sqlx::query("SELECT id, name, location FROM projects ORDER BY name")
+    let rows = sqlx::query("SELECT id, name, location, rera_number, rera_website_url FROM projects ORDER BY name")
         .fetch_all(pool)
         .await
         .map_err(|e| format!("Failed to fetch projects: {}", e))?;
@@ -601,17 +830,28 @@ pub async fn get_projects(state: State<'_, DbState>) -> Result<Vec<Project>, Str
         id: row.get("id"),
         name: row.get("name"),
         location: row.get("location"),
-        towers: None, // empty list until you fetch towers
+        rera_number: row.get("rera_number"),
+        rera_website_url: row.get("rera_website_url"),
+        towers: None,
     }).collect())
 }
 
 // UPDATE
 #[tauri::command]
-pub async fn update_project(state: State<'_, DbState>, id: i64, name: String, location: String) -> Result<(), String> {
+pub async fn update_project(
+    state: State<'_, DbState>,
+    id: i64,
+    name: String,
+    location: String,
+    rera_number: Option<String>,
+    rera_website_url: Option<String>,
+) -> Result<(), String> {
     let pool = &state.pool;
-    sqlx::query("UPDATE projects SET name = ?, location = ? WHERE id = ?")
-        .bind(name)
-        .bind(location)
+    sqlx::query("UPDATE projects SET name = ?, location = ?, rera_number = ?, rera_website_url = ? WHERE id = ?")
+        .bind(&name)
+        .bind(&location)
+        .bind(&rera_number)
+        .bind(&rera_website_url)
         .bind(id)
         .execute(pool)
         .await

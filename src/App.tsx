@@ -23,6 +23,7 @@ function App() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerPan, setCustomerPan] = useState("");
   const [customerAadhaar, setCustomerAadhaar] = useState("");
+  const [coApplicants, setCoApplicants] = useState<{ name: string; phone: string; pan_number: string; aadhaar_number: string }[]>([]);
   const [agreedSaleValue, setAgreedSaleValue] = useState("");
   const [receiptAmount, setReceiptAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<"Cash" | "Cheque" | "RTGS" | "IMPS">("RTGS");
@@ -125,6 +126,23 @@ function App() {
       return "Invalid Aadhaar Number (must be exactly 12 digits and cannot start with 0 or 1).";
     }
 
+    // Co-applicants validation
+    for (let i = 0; i < coApplicants.length; i++) {
+      const co = coApplicants[i];
+      if (!co.name.trim()) return `Co-Applicant ${i + 1} Name is required.`;
+      if (!co.phone.trim() || !/^\d{10}$/.test(co.phone.trim())) {
+        return `Co-Applicant ${i + 1} Phone must be a valid 10-digit number.`;
+      }
+      const coPan = co.pan_number.trim().toUpperCase();
+      if (!coPan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(coPan)) {
+        return `Invalid Co-Applicant ${i + 1} PAN Number format (e.g. ABCDE1234F).`;
+      }
+      const coAadhaar = co.aadhaar_number.trim();
+      if (!coAadhaar || !/^[2-9]\d{11}$/.test(coAadhaar)) {
+        return `Invalid Co-Applicant ${i + 1} Aadhaar Number (must be exactly 12 digits and cannot start with 0 or 1).`;
+      }
+    }
+
     const saleVal = parseFloat(agreedSaleValue);
     const recVal = parseFloat(receiptAmount);
 
@@ -165,6 +183,12 @@ function App() {
         pan_number: customerPan.trim().toUpperCase(),
         aadhaar_number: customerAadhaar.trim(),
       },
+      co_applicants: coApplicants.map(co => ({
+        name: co.name.trim(),
+        phone: co.phone.trim(),
+        pan_number: co.pan_number.trim().toUpperCase(),
+        aadhaar_number: co.aadhaar_number.trim(),
+      })),
       unit_id: selectedUnit.id,
       booking_date: bookingDate,
       agreed_sale_value: parseFloat(agreedSaleValue),
@@ -185,6 +209,7 @@ function App() {
       setCustomerPhone("");
       setCustomerPan("");
       setCustomerAadhaar("");
+      setCoApplicants([]);
       setTransactionRef("");
 
       // Reload dataset
@@ -256,6 +281,8 @@ function App() {
         unit_number: selectedUnit.unit_number,
         project_name: matchedProj?.name || "",
         tower_name: matchedTower?.name || "",
+        rera_number: matchedProj?.rera_number || null,
+        co_applicants: bookingDetails.co_applicants,
       };
 
       // Reload dataset
@@ -283,6 +310,24 @@ function App() {
     const balance = r.agreed_sale_value - r.amount;
     const txRef = r.transaction_ref === "CASH-PAY" ? "Cash Payment" : r.transaction_ref;
     const aadhaarMasked = `XXXX XXXX ${r.customer_aadhaar.slice(-4)}`;
+
+    const coApplicantsHtml = r.co_applicants && r.co_applicants.length > 0
+      ? r.co_applicants.filter(co => co.role === 'Co-Applicant').map((co, idx) => `
+        <div style="margin-top: 14px; border-top: 1px dashed #e5e7eb; padding-top: 10px;">
+          <div class="field-label">Co-Applicant ${idx + 1}</div>
+          <div class="field-value">${co.name}</div>
+          <div class="field-label">PAN / Aadhaar</div>
+          <div class="field-value">${co.pan_number} / XXXX XXXX ${co.aadhaar_number.slice(-4)}</div>
+        </div>
+      `).join('')
+      : '';
+
+    const reraHtml = r.rera_number
+      ? `
+      <div class="field-label">RERA Registration</div>
+      <div class="field-value">${r.rera_number}</div>
+      `
+      : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -452,11 +497,13 @@ function App() {
       <div class="field-value">${r.customer_pan}</div>
       <div class="field-label">Aadhaar Number</div>
       <div class="field-value">${aadhaarMasked}</div>
+      ${coApplicantsHtml}
     </div>
     <div class="card">
       <div class="card-title">Property Details</div>
       <div class="field-label">Project</div>
       <div class="field-value">${r.project_name}</div>
+      ${reraHtml}
       <div class="field-label">Tower / Block</div>
       <div class="field-value">${r.tower_name}</div>
       <div class="field-label">Unit Number</div>
@@ -945,7 +992,7 @@ function App() {
         )}
         {/* Tab 3: Admin */}
         {activeTab === "admin" && !loading && (
-            <AdminDashboard />
+          <AdminDashboard projectsRef={projects} />
         )}
       </main>
 
@@ -1036,6 +1083,110 @@ function App() {
                       className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
                     />
                   </div>
+                </div>
+
+                {/* Co-Applicants Section */}
+                <div className="space-y-4 pt-3 border-t border-slate-800/60 mt-4">
+                  <div className="flex justify-between items-center">
+                    <h5 className="text-xs font-bold text-slate-350">Joint Owners / Co-Applicants</h5>
+                    <button
+                      type="button"
+                      onClick={() => setCoApplicants([...coApplicants, { name: "", phone: "", pan_number: "", aadhaar_number: "" }])}
+                      className="px-2.5 py-1 text-xs bg-indigo-950/40 hover:bg-indigo-900 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 hover:text-indigo-200 rounded-lg transition-colors flex items-center gap-1 font-semibold"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      Add Co-Applicant
+                    </button>
+                  </div>
+
+                  {coApplicants.length > 0 && (
+                    <div className="space-y-4">
+                      {coApplicants.map((co, index) => (
+                        <div key={index} className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/85 relative space-y-3 animate-fade-in">
+                          <button
+                            type="button"
+                            onClick={() => setCoApplicants(coApplicants.filter((_, i) => i !== index))}
+                            className="absolute top-3 right-3 text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-900 transition-colors"
+                            title="Remove Co-applicant"
+                          >
+                            <svg xmlns="http://www.w3.org/2500/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+
+                          <h6 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Co-Applicant #{index + 1}</h6>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-medium">Name</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Co-applicant Name"
+                                value={co.name}
+                                onChange={(e) => {
+                                  const updated = [...coApplicants];
+                                  updated[index].name = e.target.value;
+                                  setCoApplicants(updated);
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-medium">Phone</label>
+                              <input
+                                type="tel"
+                                required
+                                maxLength={10}
+                                placeholder="10-digit number"
+                                value={co.phone}
+                                onChange={(e) => {
+                                  const updated = [...coApplicants];
+                                  updated[index].phone = e.target.value;
+                                  setCoApplicants(updated);
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-medium">PAN Number</label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={10}
+                                placeholder="ABCDE1234F"
+                                value={co.pan_number}
+                                onChange={(e) => {
+                                  const updated = [...coApplicants];
+                                  updated[index].pan_number = e.target.value;
+                                  setCoApplicants(updated);
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 uppercase"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-medium">Aadhaar Number</label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={12}
+                                placeholder="12-digit UID"
+                                value={co.aadhaar_number}
+                                onChange={(e) => {
+                                  const updated = [...coApplicants];
+                                  updated[index].aadhaar_number = e.target.value;
+                                  setCoApplicants(updated);
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1201,6 +1352,32 @@ function App() {
                       <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {bookingDetails.customer_aadhaar.slice(-4)}</div>
                     </div>
                   </div>
+
+                  {bookingDetails.co_applicants && bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').length > 0 && (
+                    <div className="border-t border-slate-805 pt-3 mt-3 space-y-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-455">Co-Applicant(s)</div>
+                      {bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').map((co, idx) => (
+                        <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-slate-900 pb-2 last:border-b-0 last:pb-0">
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">Name</div>
+                            <div className="font-semibold text-slate-200 mt-0.5">{co.name}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">Phone</div>
+                            <div className="font-semibold text-slate-200 mt-0.5">{co.phone}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">PAN Number</div>
+                            <div className="font-semibold text-slate-200 uppercase mt-0.5">{co.pan_number}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">Aadhaar Number</div>
+                            <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {co.aadhaar_number.slice(-4)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Receipts Listing */}
@@ -1231,6 +1408,8 @@ function App() {
                           unit_number: selectedUnit.unit_number,
                           project_name: matchedProj?.name || "",
                           tower_name: matchedTower?.name || "",
+                          rera_number: matchedProj?.rera_number || null,
+                          co_applicants: bookingDetails.co_applicants,
                         };
                         handlePrintReceipt(item);
                       };
@@ -1499,29 +1678,29 @@ function App() {
                           type="button"
                           onClick={async () => {
                             //if (confirm(`Mark Unit ${selectedUnit.unit_number} as Registered?`)) {
-                              try {
-                                setLoading(true);
-                                await invoke("update_unit_status", { unitId: selectedUnit.id, status: "Registered" });
-                                setSuccessMsg(`Unit ${selectedUnit.unit_number} updated to Registered successfully.`);
+                            try {
+                              setLoading(true);
+                              await invoke("update_unit_status", { unitId: selectedUnit.id, status: "Registered" });
+                              setSuccessMsg(`Unit ${selectedUnit.unit_number} updated to Registered successfully.`);
 
-                                // Reload map
-                                const propertyMap: Project[] = await invoke("get_property_map");
-                                setProjects(propertyMap);
-                                // update selection state
-                                const updatedUnit = propertyMap
-                                  .flatMap(p => p.towers.flatMap(t => t.units))
-                                  .find(u => u.id === selectedUnit.id);
-                                if (updatedUnit) {
-                                  setSelectedUnit(updatedUnit);
-                                  const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: updatedUnit.id });
-                                  setBookingDetails(details);
-                                }
-                              } catch (err: any) {
-                                console.error(err);
-                                setErrorMsg(err.toString() || "Failed to update unit status.");
-                              } finally {
-                                setLoading(false);
+                              // Reload map
+                              const propertyMap: Project[] = await invoke("get_property_map");
+                              setProjects(propertyMap);
+                              // update selection state
+                              const updatedUnit = propertyMap
+                                .flatMap(p => p.towers.flatMap(t => t.units))
+                                .find(u => u.id === selectedUnit.id);
+                              if (updatedUnit) {
+                                setSelectedUnit(updatedUnit);
+                                const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: updatedUnit.id });
+                                setBookingDetails(details);
                               }
+                            } catch (err: any) {
+                              console.error(err);
+                              setErrorMsg(err.toString() || "Failed to update unit status.");
+                            } finally {
+                              setLoading(false);
+                            }
                             //}
                           }}
                           className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-semibold shadow-lg shadow-purple-600/30 transition-all text-xs flex items-center gap-1.5"

@@ -28,7 +28,10 @@ pub async fn init_db(app_handle: &tauri::AppHandle) -> Result<SqlitePool, String
     // 4. Run migrations/schema setup
     create_tables(&pool).await?;
 
-    // 5. Seed initial data if database is new/empty
+    // 5. Apply incremental migrations (Phase 0 schema changes)
+    apply_migrations(&pool).await?;
+
+    // 6. Seed initial data if database is new/empty
     seed_data_if_empty(&pool).await?;
 
     Ok(pool)
@@ -151,6 +154,100 @@ async fn seed_data_if_empty(pool: &SqlitePool) -> Result<(), String> {
             .execute(pool).await.map_err(|e| e.to_string())?;
         sqlx::query("INSERT INTO units (project_id, tower_id, unit_number, status, base_price, configuration) VALUES (2, 3, 'V-02', 'Available', 18000000.0, '4BHK')")
             .execute(pool).await.map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Apply incremental schema migrations. Each migration is tracked in
+/// `_migrations` so it runs exactly once, even across app restarts.
+async fn apply_migrations(pool: &SqlitePool) -> Result<(), String> {
+    // Create migrations tracking table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS _migrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        "#
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to create migrations table: {}", e))?;
+
+    // Define all migrations in order
+    let migrations: Vec<(&str, Vec<&str>)> = vec![
+        // Phase 0.3 — RERA fields on projects
+        ("001_add_rera_fields_to_projects", vec![
+            "ALTER TABLE projects ADD COLUMN rera_number TEXT",
+            "ALTER TABLE projects ADD COLUMN rera_website_url TEXT",
+        ]),
+        // Phase 0.1 — Configurable receipt numbering
+        ("002_create_receipt_sequences", vec![
+            r#"
+            CREATE TABLE IF NOT EXISTS receipt_sequences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                financial_year TEXT NOT NULL,
+                last_number INTEGER NOT NULL DEFAULT 0,
+                prefix TEXT NOT NULL DEFAULT 'REC',
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                UNIQUE(project_id, financial_year)
+            );
+            "#,
+        ]),
+        // Phase 0.2 — booking_customers junction table for joint ownership
+        ("003_create_booking_customers", vec![
+            r#"
+            CREATE TABLE IF NOT EXISTS booking_customers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                booking_id INTEGER NOT NULL,
+                customer_id INTEGER NOT NULL,
+                role TEXT NOT NULL DEFAULT 'Primary' CHECK(role IN ('Primary', 'Co-Applicant')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+                FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+                UNIQUE(booking_id, customer_id)
+            );
+            "#,
+            // Migrate existing bookings.customer_id data into junction table
+            r#"
+            INSERT OR IGNORE INTO booking_customers (booking_id, customer_id, role)
+            SELECT id, customer_id, 'Primary' FROM bookings
+            WHERE id NOT IN (SELECT booking_id FROM booking_customers);
+            "#,
+        ]),
+    ];
+
+    for (name, queries) in migrations {
+        // Check if migration already applied
+        let applied: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM _migrations WHERE name = ?"
+        )
+        .bind(name)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("Failed to check migration '{}': {}", name, e))?;
+
+        if applied > 0 {
+            continue;
+        }
+
+        // Apply all queries in this migration
+        for query in &queries {
+            sqlx::query(query)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Migration '{}' failed: {} — Query: {}", name, e, query))?;
+        }
+
+        // Mark as applied
+        sqlx::query("INSERT INTO _migrations (name) VALUES (?)")
+            .bind(name)
+            .execute(pool)
+            .await
+            .map_err(|e| format!("Failed to record migration '{}': {}", name, e))?;
     }
 
     Ok(())

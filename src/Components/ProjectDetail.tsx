@@ -3,13 +3,15 @@ import { useEffect, useState } from "react";
 import { getProjects } from "../api/projects";
 import AdminTowers from "./AdminTowers";
 import AdminUnits from "./AdminUnits";
+import { Project } from "../types";
 
 interface ProjectDetailProps {
   projectId: number;
+  projectsRef: Project[];
   onBack: () => void; // <-- add this
 }
 
-export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
+export default function ProjectDetail({ projectId, projectsRef, onBack }: ProjectDetailProps) {
   const [project, setProject] = useState<{ id: number; name: string; location: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"towers" | "units">("towers");
 
@@ -46,21 +48,19 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
       <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
         <button
           onClick={() => setActiveTab("towers")}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-            activeTab === "towers"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === "towers"
+            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+            : "text-slate-400 hover:text-slate-200"
+            }`}
         >
           Towers
         </button>
         <button
           onClick={() => setActiveTab("units")}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-            activeTab === "units"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === "units"
+            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+            : "text-slate-400 hover:text-slate-200"
+            }`}
         >
           Units
         </button>

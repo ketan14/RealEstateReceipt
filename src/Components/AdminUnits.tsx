@@ -1,18 +1,25 @@
-import { useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState, useMemo } from "react";
 import { getUnits, createUnit, updateUnit, deleteUnit } from "../api/units.ts";
-import { Unit } from "../types/index.ts";
-
+import { Tower, Unit, UnitCSVRow } from "../types/index.ts";
+import { getTowers } from "../api/towers.ts";
+import Papa from "papaparse";
 interface AdminUnitsProps {
   projectId: number; // already provided from parent
 }
 
 export default function AdminUnits({ projectId }: AdminUnitsProps) {
   const [units, setUnits] = useState<Unit[]>([]);
+  const [towers, setTowers] = useState<Tower[]>([]);
   const [towerId, setTowerId] = useState<number | null>(null);
   const [unitNumber, setUnitNumber] = useState("");
   const [status, setStatus] = useState("Available");
   const [basePrice, setBasePrice] = useState<number>(0);
   const [configuration, setConfiguration] = useState("");
+
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [fileData, setFileData] = useState<Unit[]>([])
+  const [errors, setErrors] = useState<string[]>([]); const [mode, setMode] = useState<"single" | "bulk">("single");
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -20,12 +27,20 @@ export default function AdminUnits({ projectId }: AdminUnitsProps) {
 
   useEffect(() => {
     loadUnits();
+    loadTowers();
   }, [projectId]);
 
   async function loadUnits() {
     const data = await getUnits(projectId);
     setUnits(data);
   }
+
+  async function loadTowers() {
+    const dataTower = await getTowers(projectId); // backend should filter towers by projectId
+    console.log(dataTower)
+    setTowers(dataTower);
+  }
+
 
   async function handleCreate() {
     if (towerId && unitNumber.trim() !== "") {
@@ -76,6 +91,96 @@ export default function AdminUnits({ projectId }: AdminUnitsProps) {
     setBasePrice(0);
     setConfiguration("");
   }
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setCsvFile(e.target.files[0]);
+    }
+  };
+
+  const validateRow = (row: UnitCSVRow, index: number): string | null => {
+    if (!row.tower_id || isNaN(Number(row.tower_id))) {
+      return `Row ${index + 2}: tower_id is required and must be a number`;
+    }
+    if (!row.unit_number || row.unit_number.trim() === "") {
+      return `Row ${index + 2}: unit_number is required`;
+    }
+    if (!row.status || !['Available', 'Booked', 'Registered'].includes(row.status)) {
+      return `Row ${index + 2}: status must be Available, Booked, or Registered`;
+    }
+    if (!row.base_price || isNaN(Number(row.base_price))) {
+      return `Row ${index + 2}: base_price must be a valid number`;
+    }
+    if (!row.configuration || row.configuration.trim() === "") {
+      return `Row ${index + 2}: configuration is required`;
+    }
+    return null;
+  };
+
+  function mapCSVRowToUnit(row: UnitCSVRow, projectId: number): Omit<Unit, "id"> {
+    return {
+      project_id: projectId,
+      tower_id: Number(row.tower_id),
+      unit_number: row.unit_number.trim(),
+      status: row.status as Unit["status"],
+      base_price: parseFloat(row.base_price),
+      configuration: row.configuration.trim(),
+    };
+  }
+  const handleBulkCreate = async () => {
+    if (!csvFile) return;
+
+    setIsUploading(true);
+    setErrors([]);
+
+    Papa.parse<UnitCSVRow>(csvFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const validationErrors: string[] = [];
+        let successCount = 0;
+
+        for (let i = 0; i < results.data.length; i++) {
+          const row = results.data[i];
+          const error = validateRow(row, i);
+
+          if (error) {
+            errors.push(error);
+            continue;
+          }
+          const unitData = mapCSVRowToUnit(row, projectId);
+
+          try {
+            await createUnit(
+              unitData.project_id,
+              unitData.tower_id,
+              unitData.unit_number,
+              unitData.status,
+              unitData.base_price,
+              unitData.configuration
+            );
+            successCount++;
+          } catch (err) {
+            validationErrors.push(`Row ${i + 2}: API error - ${(err as Error).message}`);
+          }
+        }
+
+        setErrors(validationErrors);
+        setIsUploading(false);
+        loadUnits();
+
+        alert(
+          `Bulk upload finished. Success: ${successCount}, Errors: ${validationErrors.length}`
+        );
+      },
+    });
+  };
+
+  const groupedUnits = useMemo(() => {
+    return units.reduce((acc, u) => {
+      (acc[u.tower_id] ||= []).push(u);
+      return acc;
+    }, {} as Record<number, Unit[]>);
+  }, [units]);
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -84,39 +189,55 @@ export default function AdminUnits({ projectId }: AdminUnitsProps) {
       {/* Container with scrollable list */}
       <div className="flex-1 p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col">
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { { resetForm(); setShowAddModal(true) } }}
           className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-500 mb-4 self-start"
         >
           Add Unit
         </button>
 
-        {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {units.map((u) => (
-            <div
-              key={u.id}
-              className="flex justify-between items-center p-2 rounded bg-slate-800 border border-slate-700"
-            >
-              <span>
-                {u.unit_number} — <span className="text-slate-400 text-sm">Tower {u.tower_id}</span>
-                <br />
-                <span className="text-slate-400 text-xs">
-                  {u.status} | ₹{u.base_price} | {u.configuration}
-                </span>
-              </span>
-              <div className="space-x-2">
-                <button
-                  onClick={() => openUpdateModal(u)}
-                  className="px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-500"
-                >
-                  Update
-                </button>
-                <button
-                  onClick={() => handleDelete(u.id)}
-                  className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-500"
-                >
-                  Delete
-                </button>
+        {/* Group units by tower */}
+        {/* Units grouped by tower */}
+        <div className="flex-1 overflow-y-auto space-y-6">
+          {Object.entries(
+            units.reduce((acc: Record<number, typeof units>, u) => {
+              (acc[u.tower_id] ||= []).push(u);
+              return acc;
+            }, {})
+          ).map(([towerId, towerUnits]) => (
+            <div key={towerId}>
+              {/* Tower header */}
+              <h3 className="text-lg font-semibold text-slate-200 mb-3">
+                Tower {towerId} <span className="text-xs text-slate-400">({towerUnits.length} units)</span>
+              </h3>
+
+              {/* Grid of unit cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {towerUnits.map((u) => (
+                  <div
+                    key={u.id}
+                    className="rounded-xl bg-slate-900 border border-slate-700 shadow-md p-4 flex flex-col justify-between"
+                  >
+                    <div>
+                      <h4 className="font-medium text-slate-100">{u.unit_number}</h4>
+                      <p className="text-xs text-slate-400">Status: {u.status}</p>
+                      <p className="text-xs text-slate-400">₹{u.base_price} | {u.configuration}</p>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => openUpdateModal(u)}
+                        className="flex-1 px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-500 text-xs"
+                      >
+                        Update
+                      </button>
+                      <button
+                        onClick={() => handleDelete(u.id)}
+                        className="flex-1 px-2 py-1 rounded bg-red-600 text-white hover:bg-red-500 text-xs"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -125,116 +246,172 @@ export default function AdminUnits({ projectId }: AdminUnitsProps) {
 
       {/* Add Unit Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-slate-900 p-6 rounded-xl shadow-lg w-96 space-y-4">
-            <h3 className="text-lg font-semibold text-slate-200">Add New Unit</h3>
-            <input
-              type="number"
-              value={towerId ?? ""}
-              onChange={(e) => setTowerId(Number(e.target.value))}
-              placeholder="Tower ID"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <input
-              type="text"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              placeholder="Unit Number"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            >
-              <option value="Available">Available</option>
-              <option value="Booked">Booked</option>
-              <option value="Registered">Registered</option>
-            </select>
-            <input
-              type="number"
-              value={basePrice}
-              onChange={(e) => setBasePrice(Number(e.target.value))}
-              placeholder="Base Price"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <input
-              type="text"
-              value={configuration}
-              onChange={(e) => setConfiguration(e.target.value)}
-              placeholder="Configuration"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <div className="flex justify-end space-x-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-slate-900 p-6 rounded-xl shadow-lg w-[500px] space-y-4">
+            <h3 className="text-lg font-semibold text-slate-200">Add Units</h3>
+
+            {/* Mode Toggle */}
+            <div className="flex gap-4 mb-4">
               <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-500"
+                className={`flex-1 py-2 rounded-xl ${mode === "single" ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-300"}`}
+                onClick={() => setMode("single")}
               >
+                Single Unit
+              </button>
+              <button
+                className={`flex-1 py-2 rounded-xl ${mode === "bulk" ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-300"}`}
+                onClick={() => setMode("bulk")}
+              >
+                Bulk Upload
+              </button>
+            </div>
+
+            {/* Single Unit Form */}
+            {mode === "single" && (
+              <div className="space-y-3">
+                {/* Tower Select */}
+                <select value={towerId || ""} onChange={(e) => setTowerId(Number(e.target.value))}
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700">
+                  <option value="">Select Tower</option>
+                  {towers.map(tower => (
+                    <option key={tower.id} value={tower.id}>{tower.name}</option>
+                  ))}
+                </select>
+
+                {/* Unit Number */}
+                <input type="text" value={unitNumber} onChange={(e) => setUnitNumber(e.target.value)}
+                  placeholder="Unit Number" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700" />
+
+                {/* Status */}
+                <select value={status} onChange={(e) => setStatus(e.target.value)}
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700">
+                  <option value="Available">Available</option>
+                  <option value="Booked">Booked</option>
+                  <option value="Registered">Registered</option>
+                </select>
+
+                {/* Base Price */}
+                <input type="number" value={basePrice} onChange={(e) => setBasePrice(Number(e.target.value))}
+                  placeholder="Base Price" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700" />
+
+                {/* Configuration */}
+                <input type="text" value={configuration} onChange={(e) => setConfiguration(e.target.value)}
+                  placeholder="Configuration" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700" />
+              </div>
+            )}
+
+            {/* Bulk Upload Form */}
+            {mode === "bulk" && (
+              <div className="space-y-3">
+                <input type="file" accept=".csv" onChange={handleFileChange}
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700" />
+                <button onClick={handleBulkCreate}
+                  className="w-full py-2 bg-indigo-600 text-white rounded-xl">
+                  {isUploading ? "Uploading..." : "Upload Units"}
+                </button>
+                {errors.length > 0 && (
+                  <div className="text-red-400 text-sm">
+                    <h4>Errors:</h4>
+                    <ul>{errors.map((err, idx) => <li key={idx}>{err}</li>)}</ul>
+                  </div>
+                )}
+                <h4 className="text-slate-300">Parsed Rows: {fileData.length}</h4>
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex gap-4 pt-4 border-t border-slate-800">
+              <button onClick={() => setShowAddModal(false)}
+                className="flex-1 py-3 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl">
                 Cancel
               </button>
-              <button
-                onClick={handleCreate}
-                className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-500"
-              >
-                Save
-              </button>
+              {mode === "single" && (
+                <button onClick={handleCreate}
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl">
+                  Save
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
-
       {/* Update Unit Modal */}
       {showUpdateModal && selectedUnit && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-slate-900 p-6 rounded-xl shadow-lg w-96 space-y-4">
             <h3 className="text-lg font-semibold text-slate-200">Update Unit</h3>
-            <input
-              type="number"
-              value={towerId ?? ""}
-              onChange={(e) => setTowerId(Number(e.target.value))}
-              placeholder="Tower ID"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <input
-              type="text"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              placeholder="Unit Number"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            >
-              <option value="Available">Available</option>
-              <option value="Booked">Booked</option>
-              <option value="Registered">Registered</option>
-            </select>
-            <input
-              type="number"
-              value={basePrice}
-              onChange={(e) => setBasePrice(Number(e.target.value))}
-              placeholder="Base Price"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <input
-              type="text"
-              value={configuration}
-              onChange={(e) => setConfiguration(e.target.value)}
-              placeholder="Configuration"
-              className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
-            />
-            <div className="flex justify-end space-x-2">
+            <div className="">
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">Select Tower</label>
+                {towers && (
+                  <select
+                    value={towerId || ""}
+                    onChange={(e) => setTowerId(Number(e.target.value))}
+                    className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
+                  >
+                    <option value="">Select Tower</option>
+                    {towers.map(tower => (
+                      <option key={tower.id} value={tower.id}>{tower.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">Unit Number</label>
+
+                <input
+                  type="text"
+                  value={unitNumber}
+                  onChange={(e) => setUnitNumber(e.target.value)}
+                  placeholder="Unit Number"
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">Agreed Sale Value (₹)</label>
+
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
+                >
+                  <option value="Available">Available</option>
+                  <option value="Booked">Booked</option>
+                  <option value="Registered">Registered</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">Base Price (₹)</label>
+                <input
+                  type="number"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(Number(e.target.value))}
+                  placeholder="Base Price"
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">Configuration (₹)</label>
+                <input
+                  type="text"
+                  value={configuration}
+                  onChange={(e) => setConfiguration(e.target.value)}
+                  placeholder="Configuration"
+                  className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700"
+                />
+              </div>
+            </div>
+            <div className="flex gap-4 pt-4 border-t border-slate-800">
               <button
+                type="button"
                 onClick={() => setShowUpdateModal(false)}
-                className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-500"
+                className="flex-1 py-3 bg-slate-950 hover:bg-slate-850 active:bg-slate-900 border border-slate-800 text-slate-300 font-semibold rounded-xl transition-all text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateSave}
-                className="px-4 py-2 rounded bg-yellow-600 text-white hover:bg-yellow-500"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all text-sm"
               >
                 Update
               </button>

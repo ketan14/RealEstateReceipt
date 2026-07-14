@@ -8,6 +8,14 @@ export interface Unit {
   configuration: string;
 }
 
+export interface UnitCSVRow {
+  tower_id: string;
+  unit_number: string;
+  status: string;
+  base_price: string;
+  configuration: string;
+}
+
 export interface Tower {
   id: number;
   project_id: number;
@@ -19,6 +27,8 @@ export interface Project {
   id: number;
   name: string;
   location: string;
+  rera_number?: string | null;
+  rera_website_url?: string | null;
   towers: Tower[];
 }
 
@@ -32,6 +42,7 @@ export interface Customer {
 
 export interface BookingPayload {
   customer: Customer;
+  co_applicants?: Customer[];
   unit_id: number;
   booking_date: string;
   agreed_sale_value: number;
@@ -57,6 +68,8 @@ export interface ReceiptHistoryItem {
   unit_number: string;
   project_name: string;
   tower_name: string;
+  rera_number?: string | null;
+  co_applicants?: BookingCustomerInfo[] | null;
 }
 
 export interface ReceiptItem {
@@ -66,6 +79,15 @@ export interface ReceiptItem {
   payment_mode: 'Cash' | 'Cheque' | 'RTGS' | 'IMPS';
   transaction_ref: string;
   date: string;
+}
+
+export interface BookingCustomerInfo {
+  customer_id: number;
+  role: string;
+  name: string;
+  phone: string;
+  pan_number: string;
+  aadhaar_number: string;
 }
 
 export interface BookingDetails {
@@ -78,6 +100,7 @@ export interface BookingDetails {
   booking_date: string;
   unit_id: number;
   receipts: ReceiptItem[];
+  co_applicants: BookingCustomerInfo[];
 }
 
 // 1. Define an interface for our grouped records
