@@ -56,7 +56,7 @@ export default function AdminTowers({ projectId }: AdminTowersProps) {
       <h2 className="text-lg font-bold text-slate-200">Towers</h2>
 
       {/* Container with scrollable list */}
-      <div className="flex-1 p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col">
+      <div className=" ">
         <button
           onClick={() => { setTowerName(""); setShowAddModal(true) }}
           className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-500 mb-4 self-start"

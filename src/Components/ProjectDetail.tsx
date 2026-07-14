@@ -19,10 +19,14 @@ export default function ProjectDetail({ projectId, projectsRef, onBack }: Projec
     async function loadProject() {
       const projects = await getProjects();
       const found = projects.find((p) => p.id === projectId);
+      console.log("found", found)
+      console.log("projectsRef", projectsRef)
       setProject(found || null);
     }
     loadProject();
   }, [projectId]);
+
+
 
   if (!project) {
     return <p className="text-slate-400">Loading project details...</p>;
@@ -67,9 +71,9 @@ export default function ProjectDetail({ projectId, projectsRef, onBack }: Projec
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col p-6">
         {activeTab === "towers" && <AdminTowers projectId={project.id} />}
-        {activeTab === "units" && <AdminUnits projectId={project.id} />}
+        {activeTab === "units" && <AdminUnits projectId={project.id} towersRef={projectsRef.find((p) => p.id === projectId)?.towers || []} />}
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ export interface Tower {
   project_id: number;
   name: string;
   units: Unit[];
+  floor: number;
 }
 
 export interface Project {

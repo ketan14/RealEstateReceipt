@@ -46,8 +46,7 @@ function App() {
   const [partPaymentMode, setPartPaymentMode] = useState<"Cash" | "Cheque" | "RTGS" | "IMPS">("RTGS");
   const [partTransactionRef, setPartTransactionRef] = useState("");
   const [partPaymentDate, setPartPaymentDate] = useState(new Date().toISOString().split("T")[0]);
-
-
+  const [expandedTowers, setExpandedTowers] = useState<number[]>([]);
   // Load Data
   const loadData = async () => {
     setLoading(true);
@@ -598,6 +597,14 @@ function App() {
     }, {})
   );
 
+  const toggleTower = (towerId: number) => {
+    setExpandedTowers((prev) =>
+      prev.includes(towerId)
+        ? prev.filter((id) => id !== towerId)
+        : [...prev, towerId]
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
       {/* Header */}
@@ -619,7 +626,10 @@ function App() {
         {/* Tab Controls */}
         <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
           <button
-            onClick={() => setActiveTab("explorer")}
+            onClick={() => {
+              setActiveTab("explorer");
+              loadData();
+            }}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === "explorer"
               ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
               : "text-slate-400 hover:text-slate-200"
@@ -652,1084 +662,1134 @@ function App() {
             Admin
           </button>
         </div>
-      </header>
+      </header >
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto p-6">
+      < main className="max-w-7xl mx-auto p-6" >
         {/* Banner messages */}
-        {errorMsg && !isBookingOpen && (
-          <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 flex items-start gap-3 animate-fade-in">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mt-0.5 text-red-400 shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            <div className="text-sm">
-              <span className="font-semibold">Error Occurred:</span> {errorMsg}
+        {
+          errorMsg && !isBookingOpen && (
+            <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 flex items-start gap-3 animate-fade-in">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mt-0.5 text-red-400 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <div className="text-sm">
+                <span className="font-semibold">Error Occurred:</span> {errorMsg}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
-        {successMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-200 flex items-start gap-3 animate-fade-in">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mt-0.5 text-emerald-400 shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="text-sm font-semibold">{successMsg}</div>
-          </div>
-        )}
+        {
+          successMsg && (
+            <div className="mb-6 p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-200 flex items-start gap-3 animate-fade-in">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mt-0.5 text-emerald-400 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="text-sm font-semibold">{successMsg}</div>
+            </div>
+          )
+        }
 
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-            <span className="ml-3 text-slate-400 text-sm">Processing securely...</span>
-          </div>
-        )}
+        {
+          loading && (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+              <span className="ml-3 text-slate-400 text-sm">Processing securely...</span>
+            </div>
+          )
+        }
 
         {/* Tab 1: Explorer */}
-        {activeTab === "explorer" && !loading && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Cols: Project Map */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-bold text-slate-200">Interactive Map</h2>
-                <div className="flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-sm bg-emerald-900 border border-emerald-500"></span>
-                    <span className="text-slate-400">Available</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-sm bg-amber-900 border border-amber-500"></span>
-                    <span className="text-slate-400">Booked</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-sm bg-purple-900 border border-purple-500"></span>
-                    <span className="text-slate-400">Registered</span>
+        {
+          activeTab === "explorer" && !loading && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left 2 Cols: Project Map */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-slate-200">Interactive Map</h2>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm bg-emerald-900 border border-emerald-500"></span>
+                      <span className="text-slate-400">Available</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm bg-amber-900 border border-amber-500"></span>
+                      <span className="text-slate-400">Booked</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm bg-purple-900 border border-purple-500"></span>
+                      <span className="text-slate-400">Registered</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {projects.length === 0 ? (
-                <div className="p-8 rounded-xl bg-slate-900 border border-slate-800 text-center text-slate-400 text-sm">
-                  No property data found.
-                </div>
-              ) : (
-                projects.map((project) => (
-                  <div key={project.id} className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6 shadow-xl">
-                    {/* Project Header */}
-                    <div>
-                      <h3 className="text-base font-bold text-slate-200">{project.name}</h3>
-                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-slate-500">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                        </svg>
-                        {project.location}
-                      </p>
-                    </div>
-
-                    {/* Towers */}
-                    <div className="space-y-4">
-                      {project?.towers?.map((tower) => (
-                        <div key={tower.id} className="p-4 rounded-xl bg-slate-950/50 border border-slate-800/60 space-y-3">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{tower.name}</h4>
-
-                          {/* Unit Grid */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                            {tower.units.map((unit) => {
-                              const isSelected = selectedUnit?.id === unit.id;
-                              const statusStyles = {
-                                Available: "bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-500/50 text-emerald-400",
-                                Booked: "bg-amber-950/20 hover:bg-amber-950/40 border-amber-500/50 text-amber-400 cursor-not-allowed",
-                                Registered: "bg-purple-950/20 hover:bg-purple-950/40 border-purple-500/50 text-purple-400 cursor-not-allowed",
-                              }[unit.status];
-
-                              return (
-                                <button
-                                  key={unit.id}
-                                  onClick={() => selectUnitForBooking(unit)}
-                                  className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all duration-200 transform hover:-translate-y-0.5 active:scale-95 ${statusStyles} ${isSelected ? "ring-2 ring-indigo-500 scale-102 border-indigo-400 shadow-md shadow-indigo-500/10" : ""
-                                    }`}
-                                >
-                                  <div className="flex justify-between items-start w-full">
-                                    <span className="text-sm font-bold">{unit.unit_number}</span>
-                                    <span className="text-[10px] font-medium bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">
-                                      {unit.configuration}
-                                    </span>
-                                  </div>
-                                  <div className="mt-2 text-xs font-medium">
-                                    ₹{(unit.base_price / 100000).toFixed(1)}L
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {projects.length === 0 ? (
+                  <div className="p-8 rounded-xl bg-slate-900 border border-slate-800 text-center text-slate-400 text-sm">
+                    No property data found.
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* Right 1 Col: Context Panel */}
-            <div className="space-y-6">
-              {/* Selected Unit Details Panel */}
-              <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-6">
-                <h3 className="text-base font-bold text-slate-200">Property Information</h3>
-
-                {selectedUnit ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                        <div className="text-[10px] uppercase font-bold text-slate-500">Unit Number</div>
-                        <div className="text-sm font-bold text-slate-200 mt-0.5">{selectedUnit.unit_number}</div>
-                      </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                        <div className="text-[10px] uppercase font-bold text-slate-500">Configuration</div>
-                        <div className="text-sm font-bold text-slate-200 mt-0.5">{selectedUnit.configuration}</div>
-                      </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                        <div className="text-[10px] uppercase font-bold text-slate-500">Base Price</div>
-                        <div className="text-sm font-bold text-emerald-400 mt-0.5">₹{selectedUnit.base_price.toLocaleString("en-IN")}</div>
-                      </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                        <div className="text-[10px] uppercase font-bold text-slate-500">Availability</div>
-                        <div className={`text-xs font-semibold inline-block px-2 py-0.5 rounded mt-1.5 ${selectedUnit.status === "Available" ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" :
-                          selectedUnit.status === "Booked" ? "bg-amber-950 text-amber-300 border border-amber-500/30" :
-                            "bg-purple-950 text-purple-300 border border-purple-500/30"
-                          }`}>
-                          {selectedUnit.status}
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedUnit.status === "Available" ? (
-                      <button
-                        onClick={() => setIsBookingOpen(true)}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30 transition-all text-sm flex justify-center items-center gap-2"
+                ) : <div>
+                  <div className="space-y-6">
+                    {projects.map((project) => (
+                      <div
+                        key={project.id}
+                        className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6 shadow-xl"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Initiate Booking
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setIsDetailsOpen(true)}
-                        className="w-full py-3 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl font-semibold shadow-lg shadow-amber-600/30 transition-all text-sm flex justify-center items-center gap-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        View Booking Details
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-xs text-slate-500 text-center py-8">
-                    Select an available unit from the map to trigger booking workflows.
-                  </div>
-                )}
-              </div>
+                        {/* Project Header */}
+                        <h3 className="text-base font-bold text-slate-200">{project.name}</h3>
+                        <p className="text-xs text-slate-400">{project.location}</p>
 
-              {/* Quick Summary Widgets */}
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-950/30 to-slate-900 border border-indigo-900/30 shadow-xl">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Business Summary</h4>
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[10px] text-slate-500">Bookings (LTD)</div>
-                    <div className="text-xl font-bold text-slate-200 mt-1">{uniqueCombinations.length}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500">Collected Revenue</div>
-                    <div className="text-xl font-bold text-indigo-400 mt-1">
-                      ₹{(receipts.reduce((acc, r) => acc + r.amount, 0) / 100000).toFixed(1)}L
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                        {/* Towers */}
+                        <div className="space-y-4">
+                          {project?.towers?.map((tower) => {
+                            const isExpanded = expandedTowers.includes(tower.id);
 
-        {/* Tab 2: Ledger/History */}
-        {activeTab === "history" && !loading && (
-          <div className="space-y-6">
-            {/* Filter Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
-              {/* Search */}
-              <div className="relative w-full md:max-w-sm">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-slate-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.604 10.604z" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search receipt, customer, unit..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-850 pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-200"
-                />
-              </div>
-
-              {/* Mode filter */}
-              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                <span className="text-xs text-slate-400">Payment Mode:</span>
-                <select
-                  value={filterMode}
-                  onChange={(e) => setFilterMode(e.target.value)}
-                  className="bg-slate-950 border border-slate-850 px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                >
-                  <option value="All">All Modes</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="RTGS">RTGS</option>
-                  <option value="IMPS">IMPS</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Receipts List */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
-                      <th className="px-6 py-4">Receipt Info ({groupedReceipts.length} Groups)</th>
-                      <th className="px-6 py-4">Customer Details</th>
-                      <th className="px-6 py-4">Property</th>
-                      <th className="px-6 py-4 text-right">Agreed Value</th>
-                      <th className="px-6 py-4 text-right">Total Paid Amount</th>
-                      <th className="px-6 py-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-sm">
-                    {groupedReceipts.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                          No transactions found matching the criteria.
-                        </td>
-                      </tr>
-                    ) : (
-                      groupedReceipts.map((group) => (
-                        <tr key={group.id} className="hover:bg-slate-850/30 transition-colors align-top">
-                          {/* Column 1: Stacked Receipt Numbers & Payment details inside this Group */}
-                          <td className="px-6 py-4 max-w-[220px]">
-                            <div className="space-y-3">
-                              {group.all_receipts.map((receipt) => (
-                                <div key={receipt.receipt_id} className="border-l-2 border-indigo-500/40 pl-2">
-                                  <div className="font-bold text-slate-200 text-xs">{receipt.receipt_number}</div>
-                                  <div className="text-[10px] text-slate-400 font-medium">{receipt.date}</div>
-                                  <div className="text-[10px] text-indigo-400 flex items-center gap-1 mt-0.5">
-                                    <span className="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded font-medium text-[9px]">
-                                      {receipt.payment_mode}
-                                    </span>
-                                    <span className="text-slate-500 truncate max-w-[100px]" title={receipt.transaction_ref}>
-                                      {receipt.transaction_ref}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-
-                          {/* Column 2: Customer Details */}
-                          <td className="px-6 py-4">
-                            <div className="font-semibold text-slate-200">{group.customer_name}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">{group.customer_phone}</div>
-                          </td>
-
-                          {/* Column 3: Property Details */}
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-slate-200">Unit {group.unit_number}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              {group.project_name} • {group.tower_name}
-                            </div>
-                          </td>
-
-                          {/* Column 4: Agreed Value */}
-                          <td className="px-6 py-4 text-right text-slate-300 font-semibold">
-                            ₹{group.agreed_sale_value.toLocaleString("en-IN")}
-                          </td>
-
-                          {/* Column 5: Aggregated Total Amount Paid */}
-                          <td className="px-6 py-4 text-right text-emerald-400 font-bold">
-                            ₹{group.total_amount_paid.toLocaleString("en-IN")}
-                            {group.all_receipts.length > 1 && (
-                              <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                                Combined ({group.all_receipts.length} receipts)
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Column 6: Print Actions (Renders print buttons stacked for each item) */}
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex flex-col items-center gap-1.5">
-                              {group.all_receipts.map((receipt) => (
+                            return (
+                              <div
+                                key={tower.id}
+                                className="p-4 rounded-xl bg-slate-950/50 border border-slate-800/60"
+                              >
+                                {/* Tower Header */}
                                 <button
-                                  key={receipt.receipt_id}
-                                  onClick={() => handlePrintReceipt(receipt)}
-                                  title={`Print ${receipt.receipt_number}`}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/40 hover:border-indigo-400 text-indigo-300 hover:text-indigo-100 rounded text-[11px] font-medium transition-all duration-200 group w-full justify-center whitespace-nowrap"
+                                  onClick={() => toggleTower(tower.id)}
+                                  className="w-full flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.75 19.5H17.25l-.72-5.671M6.72 13.829A9.006 9.006 0 0112 12.75c2.388 0 4.558.94 6.15 2.475" />
+                                  <span>{tower.name}</span>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth={2}
+                                    stroke="currentColor"
+                                    className={`w-4 h-4 transform transition-transform duration-200 ${isExpanded ? "rotate-180" : "rotate-0"
+                                      }`}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M19 9l-7 7-7-7"
+                                    />
                                   </svg>
-                                  Print {receipt.receipt_number.split("-")[1] || receipt.receipt_number}
                                 </button>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+
+                                {/* Unit Grid (collapsible) */}
+                                {isExpanded && (
+                                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                    {tower.units.map((unit) => {
+                                      const isSelected = selectedUnit?.id === unit.id;
+                                      const statusStyles = {
+                                        Available:
+                                          "bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-500/50 text-emerald-400",
+                                        Booked:
+                                          "bg-amber-950/20 hover:bg-amber-950/40 border-amber-500/50 text-amber-400 cursor-not-allowed",
+                                        Registered:
+                                          "bg-purple-950/20 hover:bg-purple-950/40 border-purple-500/50 text-purple-400 cursor-not-allowed",
+                                      }[unit.status];
+
+                                      return (
+                                        <button
+                                          key={unit.id}
+                                          onClick={() => selectUnitForBooking(unit)}
+                                          className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all duration-200 transform hover:-translate-y-0.5 active:scale-95 ${statusStyles} ${isSelected
+                                            ? "ring-2 ring-indigo-500 scale-102 border-indigo-400 shadow-md shadow-indigo-500/10"
+                                            : ""
+                                            }`}
+                                        >
+                                          <div className="flex justify-between items-start w-full">
+                                            <span className="text-sm font-bold">
+                                              {unit.unit_number}
+                                            </span>
+                                            <span className="text-[10px] font-medium bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">
+                                              {unit.configuration}
+                                            </span>
+                                          </div>
+                                          <div className="mt-2 text-xs font-medium">
+                                            ₹{(unit.base_price / 100000).toFixed(1)}L
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
               </div>
-            </div>
-          </div>
-        )}
-        {/* Tab 3: Admin */}
-        {activeTab === "admin" && !loading && (
-          <AdminDashboard projectsRef={projects} />
-        )}
-      </main>
 
-      {/* Booking Form Modal Overlay */}
-      {isBookingOpen && selectedUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-bold text-slate-200">Generate Booking & Receipt</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Unit {selectedUnit.unit_number} • {selectedUnit.configuration}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setIsBookingOpen(false);
-                  setErrorMsg(null);
-                }}
-                className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-900/60"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+              {/* Right 1 Col: Context Panel */}
+              <div className="space-y-6">
+                {/* Selected Unit Details Panel */}
+                <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-6">
+                  <h3 className="text-base font-bold text-slate-200">Property Information</h3>
 
-            {/* Modal Form */}
-            <form onSubmit={handleBookingSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-              {errorMsg && (
-                <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 flex items-start gap-3 animate-fade-in text-xs">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400 shrink-0">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                  </svg>
-                  <div>
-                    <span className="font-semibold">Error:</span> {errorMsg}
-                  </div>
-                </div>
-              )}
-              {/* Section 1: Customer Profile */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Customer Profile</h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Full Name"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Phone</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="10-digit number"
-                      maxLength={10}
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">PAN Number</label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={10}
-                      placeholder="ABCDE1234F"
-                      value={customerPan}
-                      onChange={(e) => setCustomerPan(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 uppercase"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Aadhaar Card Number</label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={12}
-                      placeholder="12-digit UID"
-                      value={customerAadhaar}
-                      onChange={(e) => setCustomerAadhaar(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Co-Applicants Section */}
-                <div className="space-y-4 pt-3 border-t border-slate-800/60 mt-4">
-                  <div className="flex justify-between items-center">
-                    <h5 className="text-xs font-bold text-slate-350">Joint Owners / Co-Applicants</h5>
-                    <button
-                      type="button"
-                      onClick={() => setCoApplicants([...coApplicants, { name: "", phone: "", pan_number: "", aadhaar_number: "" }])}
-                      className="px-2.5 py-1 text-xs bg-indigo-950/40 hover:bg-indigo-900 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 hover:text-indigo-200 rounded-lg transition-colors flex items-center gap-1 font-semibold"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      Add Co-Applicant
-                    </button>
-                  </div>
-
-                  {coApplicants.length > 0 && (
+                  {selectedUnit ? (
                     <div className="space-y-4">
-                      {coApplicants.map((co, index) => (
-                        <div key={index} className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/85 relative space-y-3 animate-fade-in">
-                          <button
-                            type="button"
-                            onClick={() => setCoApplicants(coApplicants.filter((_, i) => i !== index))}
-                            className="absolute top-3 right-3 text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-900 transition-colors"
-                            title="Remove Co-applicant"
-                          >
-                            <svg xmlns="http://www.w3.org/2500/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-
-                          <h6 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Co-Applicant #{index + 1}</h6>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-medium">Name</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="Co-applicant Name"
-                                value={co.name}
-                                onChange={(e) => {
-                                  const updated = [...coApplicants];
-                                  updated[index].name = e.target.value;
-                                  setCoApplicants(updated);
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-medium">Phone</label>
-                              <input
-                                type="tel"
-                                required
-                                maxLength={10}
-                                placeholder="10-digit number"
-                                value={co.phone}
-                                onChange={(e) => {
-                                  const updated = [...coApplicants];
-                                  updated[index].phone = e.target.value;
-                                  setCoApplicants(updated);
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-medium">PAN Number</label>
-                              <input
-                                type="text"
-                                required
-                                maxLength={10}
-                                placeholder="ABCDE1234F"
-                                value={co.pan_number}
-                                onChange={(e) => {
-                                  const updated = [...coApplicants];
-                                  updated[index].pan_number = e.target.value;
-                                  setCoApplicants(updated);
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 uppercase"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-medium">Aadhaar Number</label>
-                              <input
-                                type="text"
-                                required
-                                maxLength={12}
-                                placeholder="12-digit UID"
-                                value={co.aadhaar_number}
-                                onChange={(e) => {
-                                  const updated = [...coApplicants];
-                                  updated[index].aadhaar_number = e.target.value;
-                                  setCoApplicants(updated);
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                              />
-                            </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                          <div className="text-[10px] uppercase font-bold text-slate-500">Unit Number</div>
+                          <div className="text-sm font-bold text-slate-200 mt-0.5">{selectedUnit.unit_number}</div>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                          <div className="text-[10px] uppercase font-bold text-slate-500">Configuration</div>
+                          <div className="text-sm font-bold text-slate-200 mt-0.5">{selectedUnit.configuration}</div>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                          <div className="text-[10px] uppercase font-bold text-slate-500">Base Price</div>
+                          <div className="text-sm font-bold text-emerald-400 mt-0.5">₹{selectedUnit.base_price.toLocaleString("en-IN")}</div>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                          <div className="text-[10px] uppercase font-bold text-slate-500">Availability</div>
+                          <div className={`text-xs font-semibold inline-block px-2 py-0.5 rounded mt-1.5 ${selectedUnit.status === "Available" ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" :
+                            selectedUnit.status === "Booked" ? "bg-amber-950 text-amber-300 border border-amber-500/30" :
+                              "bg-purple-950 text-purple-300 border border-purple-500/30"
+                            }`}>
+                            {selectedUnit.status}
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {selectedUnit.status === "Available" ? (
+                        <button
+                          onClick={() => setIsBookingOpen(true)}
+                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30 transition-all text-sm flex justify-center items-center gap-2"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                          Initiate Booking
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setIsDetailsOpen(true)}
+                          className="w-full py-3 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl font-semibold shadow-lg shadow-amber-600/30 transition-all text-sm flex justify-center items-center gap-2"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          View Booking Details
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-500 text-center py-8">
+                      Select an available unit from the map to trigger booking workflows.
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Section 2: Financial Details */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Financial & Booking Details</h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Agreed Sale Value (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      placeholder="Total Value"
-                      value={agreedSaleValue}
-                      onChange={(e) => setAgreedSaleValue(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                    {parseFloat(agreedSaleValue) < selectedUnit.base_price && (
-                      <span className="text-[10px] text-amber-400 font-medium">Value is below base price (₹{selectedUnit.base_price.toLocaleString()})</span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Booking/Receipt Amount (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      placeholder="Amount Paid Now"
-                      value={receiptAmount}
-                      onChange={(e) => setReceiptAmount(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Payment Mode</label>
-                    <select
-                      value={paymentMode}
-                      onChange={(e) => setPaymentMode(e.target.value as any)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    >
-                      <option value="RTGS">RTGS</option>
-                      <option value="IMPS">IMPS</option>
-                      <option value="Cheque">Cheque</option>
-                      <option value="Cash">Cash</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">Booking Date</label>
-                    <input
-                      type="date"
-                      required
-                      value={bookingDate}
-                      onChange={(e) => setBookingDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
+                {/* Quick Summary Widgets */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-950/30 to-slate-900 border border-indigo-900/30 shadow-xl">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Business Summary</h4>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-[10px] text-slate-500">Bookings (LTD)</div>
+                      <div className="text-xl font-bold text-slate-200 mt-1">{uniqueCombinations.length}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-500">Collected Revenue</div>
+                      <div className="text-xl font-bold text-indigo-400 mt-1">
+                        ₹{(receipts.reduce((acc, r) => acc + r.amount, 0) / 100000).toFixed(1)}L
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )
+        }
 
-                {paymentMode !== "Cash" && (
-                  <div className="space-y-1.5 animate-fade-in">
-                    <label className="text-xs text-slate-400 font-medium">Transaction Reference No / Cheque No</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="UTR / Ref Number"
-                      value={transactionRef}
-                      onChange={(e) => setTransactionRef(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                    />
-                  </div>
-                )}
+        {/* Tab 2: Ledger/History */}
+        {
+          activeTab === "history" && !loading && (
+            <div className="space-y-6">
+              {/* Filter Bar */}
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                {/* Search */}
+                <div className="relative w-full md:max-w-sm">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-slate-500">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.604 10.604z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search receipt, customer, unit..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-850 pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-200"
+                  />
+                </div>
+
+                {/* Mode filter */}
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  <span className="text-xs text-slate-400">Payment Mode:</span>
+                  <select
+                    value={filterMode}
+                    onChange={(e) => setFilterMode(e.target.value)}
+                    className="bg-slate-950 border border-slate-850 px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                  >
+                    <option value="All">All Modes</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="RTGS">RTGS</option>
+                    <option value="IMPS">IMPS</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-4 pt-4 border-t border-slate-800">
+              {/* Receipts List */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+                        <th className="px-6 py-4">Receipt Info ({groupedReceipts.length} Groups)</th>
+                        <th className="px-6 py-4">Customer Details</th>
+                        <th className="px-6 py-4">Property</th>
+                        <th className="px-6 py-4 text-right">Agreed Value</th>
+                        <th className="px-6 py-4 text-right">Total Paid Amount</th>
+                        <th className="px-6 py-4 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-sm">
+                      {groupedReceipts.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                            No transactions found matching the criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedReceipts.map((group) => (
+                          <tr key={group.id} className="hover:bg-slate-850/30 transition-colors align-top">
+                            {/* Column 1: Stacked Receipt Numbers & Payment details inside this Group */}
+                            <td className="px-6 py-4 max-w-[220px]">
+                              <div className="space-y-3">
+                                {group.all_receipts.map((receipt) => (
+                                  <div key={receipt.receipt_id} className="border-l-2 border-indigo-500/40 pl-2">
+                                    <div className="font-bold text-slate-200 text-xs">{receipt.receipt_number}</div>
+                                    <div className="text-[10px] text-slate-400 font-medium">{receipt.date}</div>
+                                    <div className="text-[10px] text-indigo-400 flex items-center gap-1 mt-0.5">
+                                      <span className="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded font-medium text-[9px]">
+                                        {receipt.payment_mode}
+                                      </span>
+                                      <span className="text-slate-500 truncate max-w-[100px]" title={receipt.transaction_ref}>
+                                        {receipt.transaction_ref}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+
+                            {/* Column 2: Customer Details */}
+                            <td className="px-6 py-4">
+                              <div className="font-semibold text-slate-200">{group.customer_name}</div>
+                              <div className="text-xs text-slate-400 mt-0.5">{group.customer_phone}</div>
+                            </td>
+
+                            {/* Column 3: Property Details */}
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-slate-200">Unit {group.unit_number}</div>
+                              <div className="text-xs text-slate-400 mt-0.5">
+                                {group.project_name} • {group.tower_name}
+                              </div>
+                            </td>
+
+                            {/* Column 4: Agreed Value */}
+                            <td className="px-6 py-4 text-right text-slate-300 font-semibold">
+                              ₹{group.agreed_sale_value.toLocaleString("en-IN")}
+                            </td>
+
+                            {/* Column 5: Aggregated Total Amount Paid */}
+                            <td className="px-6 py-4 text-right text-emerald-400 font-bold">
+                              ₹{group.total_amount_paid.toLocaleString("en-IN")}
+                              {group.all_receipts.length > 1 && (
+                                <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                  Combined ({group.all_receipts.length} receipts)
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Column 6: Print Actions (Renders print buttons stacked for each item) */}
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex flex-col items-center gap-1.5">
+                                {group.all_receipts.map((receipt) => (
+                                  <button
+                                    key={receipt.receipt_id}
+                                    onClick={() => handlePrintReceipt(receipt)}
+                                    title={`Print ${receipt.receipt_number}`}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/40 hover:border-indigo-400 text-indigo-300 hover:text-indigo-100 rounded text-[11px] font-medium transition-all duration-200 group w-full justify-center whitespace-nowrap"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.75 19.5H17.25l-.72-5.671M6.72 13.829A9.006 9.006 0 0112 12.75c2.388 0 4.558.94 6.15 2.475" />
+                                    </svg>
+                                    Print {receipt.receipt_number.split("-")[1] || receipt.receipt_number}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )
+        }
+        {/* Tab 3: Admin */}
+        {
+          activeTab === "admin" && !loading && (
+            <AdminDashboard projectsRef={projects} />
+          )
+        }
+      </main >
+
+      {/* Booking Form Modal Overlay */}
+      {
+        isBookingOpen && selectedUnit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-bold text-slate-200">Generate Booking & Receipt</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Unit {selectedUnit.unit_number} • {selectedUnit.configuration}</p>
+                </div>
                 <button
-                  type="button"
                   onClick={() => {
                     setIsBookingOpen(false);
                     setErrorMsg(null);
                   }}
-                  className="flex-1 py-3 bg-slate-950 hover:bg-slate-850 active:bg-slate-900 border border-slate-800 text-slate-300 font-semibold rounded-xl transition-all text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all text-sm"
-                >
-                  Confirm & Print Receipt
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Booked Unit Details Modal Overlay */}
-      {isDetailsOpen && selectedUnit && bookingDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in animate-duration-200">
-          <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
-
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0">
-              <div>
-                <h3 className="text-base font-bold text-slate-200">Booking Ledger & Details</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Unit {selectedUnit.unit_number} • {selectedUnit.configuration} • {
-                    projects.find(p => p.id === selectedUnit.project_id)?.name
-                  } ({
-                    projects.find(p => p.id === selectedUnit.project_id)?.towers.find(t => t.id === selectedUnit.tower_id)?.name
-                  })
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${selectedUnit.status === "Booked"
-                  ? "bg-amber-950/50 border-amber-500/50 text-amber-300"
-                  : "bg-purple-950/50 border-purple-500/50 text-purple-300"
-                  }`}>
-                  {selectedUnit.status}
-                </span>
-                <button
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    setErrorMsg(null);
-                    setSuccessMsg(null);
-                  }}
-                  className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-900/60 transition-colors"
+                  className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-900/60"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-            </div>
 
-            {/* Modal Content - Two-column Grid (Scrollable) */}
-            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Modal Form */}
+              <form onSubmit={handleBookingSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                {errorMsg && (
+                  <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 flex items-start gap-3 animate-fade-in text-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400 shrink-0">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                    <div>
+                      <span className="font-semibold">Error:</span> {errorMsg}
+                    </div>
+                  </div>
+                )}
+                {/* Section 1: Customer Profile */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Customer Profile</h4>
 
-              {/* Left Column: Customer Info & Receipt History */}
-              <div className="space-y-6">
-
-                {/* Customer Details Card */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-3 shadow-md">
-                  <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Customer Profile</div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-medium">Customer Name</div>
-                      <div className="font-semibold text-slate-200 text-sm mt-0.5">{bookingDetails.customer_name}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Full Name"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
                     </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-medium">Contact Phone</div>
-                      <div className="font-semibold text-slate-200 text-sm mt-0.5">{bookingDetails.customer_phone}</div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Phone</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="10-digit number"
+                        maxLength={10}
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
                     </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-medium">PAN Number</div>
-                      <div className="font-semibold text-slate-200 uppercase mt-0.5">{bookingDetails.customer_pan}</div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">PAN Number</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={10}
+                        placeholder="ABCDE1234F"
+                        value={customerPan}
+                        onChange={(e) => setCustomerPan(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 uppercase"
+                      />
                     </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-medium">Aadhaar Number</div>
-                      <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {bookingDetails.customer_aadhaar.slice(-4)}</div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Aadhaar Card Number</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={12}
+                        placeholder="12-digit UID"
+                        value={customerAadhaar}
+                        onChange={(e) => setCustomerAadhaar(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
                     </div>
                   </div>
 
-                  {bookingDetails.co_applicants && bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').length > 0 && (
-                    <div className="border-t border-slate-805 pt-3 mt-3 space-y-3">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-455">Co-Applicant(s)</div>
-                      {bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').map((co, idx) => (
-                        <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-slate-900 pb-2 last:border-b-0 last:pb-0">
-                          <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Name</div>
-                            <div className="font-semibold text-slate-200 mt-0.5">{co.name}</div>
+                  {/* Co-Applicants Section */}
+                  <div className="space-y-4 pt-3 border-t border-slate-800/60 mt-4">
+                    <div className="flex justify-between items-center">
+                      <h5 className="text-xs font-bold text-slate-350">Joint Owners / Co-Applicants</h5>
+                      <button
+                        type="button"
+                        onClick={() => setCoApplicants([...coApplicants, { name: "", phone: "", pan_number: "", aadhaar_number: "" }])}
+                        className="px-2.5 py-1 text-xs bg-indigo-950/40 hover:bg-indigo-900 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 hover:text-indigo-200 rounded-lg transition-colors flex items-center gap-1 font-semibold"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Add Co-Applicant
+                      </button>
+                    </div>
+
+                    {coApplicants.length > 0 && (
+                      <div className="space-y-4">
+                        {coApplicants.map((co, index) => (
+                          <div key={index} className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/85 relative space-y-3 animate-fade-in">
+                            <button
+                              type="button"
+                              onClick={() => setCoApplicants(coApplicants.filter((_, i) => i !== index))}
+                              className="absolute top-3 right-3 text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-900 transition-colors"
+                              title="Remove Co-applicant"
+                            >
+                              <svg xmlns="http://www.w3.org/2500/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+
+                            <h6 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Co-Applicant #{index + 1}</h6>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-medium">Name</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Co-applicant Name"
+                                  value={co.name}
+                                  onChange={(e) => {
+                                    const updated = [...coApplicants];
+                                    updated[index].name = e.target.value;
+                                    setCoApplicants(updated);
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-medium">Phone</label>
+                                <input
+                                  type="tel"
+                                  required
+                                  maxLength={10}
+                                  placeholder="10-digit number"
+                                  value={co.phone}
+                                  onChange={(e) => {
+                                    const updated = [...coApplicants];
+                                    updated[index].phone = e.target.value;
+                                    setCoApplicants(updated);
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-medium">PAN Number</label>
+                                <input
+                                  type="text"
+                                  required
+                                  maxLength={10}
+                                  placeholder="ABCDE1234F"
+                                  value={co.pan_number}
+                                  onChange={(e) => {
+                                    const updated = [...coApplicants];
+                                    updated[index].pan_number = e.target.value;
+                                    setCoApplicants(updated);
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 uppercase"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-medium">Aadhaar Number</label>
+                                <input
+                                  type="text"
+                                  required
+                                  maxLength={12}
+                                  placeholder="12-digit UID"
+                                  value={co.aadhaar_number}
+                                  onChange={(e) => {
+                                    const updated = [...coApplicants];
+                                    updated[index].aadhaar_number = e.target.value;
+                                    setCoApplicants(updated);
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Phone</div>
-                            <div className="font-semibold text-slate-200 mt-0.5">{co.phone}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-slate-500 font-medium">PAN Number</div>
-                            <div className="font-semibold text-slate-200 uppercase mt-0.5">{co.pan_number}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-slate-500 font-medium">Aadhaar Number</div>
-                            <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {co.aadhaar_number.slice(-4)}</div>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section 2: Financial Details */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Financial & Booking Details</h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Agreed Sale Value (₹)</label>
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        placeholder="Total Value"
+                        value={agreedSaleValue}
+                        onChange={(e) => setAgreedSaleValue(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
+                      {parseFloat(agreedSaleValue) < selectedUnit.base_price && (
+                        <span className="text-[10px] text-amber-400 font-medium">Value is below base price (₹{selectedUnit.base_price.toLocaleString()})</span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Booking/Receipt Amount (₹)</label>
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        placeholder="Amount Paid Now"
+                        value={receiptAmount}
+                        onChange={(e) => setReceiptAmount(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Payment Mode</label>
+                      <select
+                        value={paymentMode}
+                        onChange={(e) => setPaymentMode(e.target.value as any)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      >
+                        <option value="RTGS">RTGS</option>
+                        <option value="IMPS">IMPS</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Cash">Cash</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-slate-400 font-medium">Booking Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
+                    </div>
+                  </div>
+
+                  {paymentMode !== "Cash" && (
+                    <div className="space-y-1.5 animate-fade-in">
+                      <label className="text-xs text-slate-400 font-medium">Transaction Reference No / Cheque No</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="UTR / Ref Number"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                      />
                     </div>
                   )}
                 </div>
 
-                {/* Receipts Listing */}
-                <div className="space-y-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex justify-between items-center">
-                    <span>Receipt Ledger ({bookingDetails.receipts.length})</span>
-                    <span className="text-[10px] text-slate-500 font-normal">Sorted oldest to newest</span>
-                  </div>
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    {bookingDetails.receipts.map((rec) => {
-                      const handlePrint = () => {
-                        const matchedProj = projects.find((p) => p.id === selectedUnit.project_id);
-                        const matchedTower = matchedProj?.towers.find((t) => t.id === selectedUnit.tower_id);
-                        const item: ReceiptHistoryItem = {
-                          receipt_id: rec.id,
-                          receipt_number: rec.receipt_number,
-                          amount: rec.amount,
-                          payment_mode: rec.payment_mode,
-                          transaction_ref: rec.transaction_ref,
-                          date: rec.date,
-                          booking_id: bookingDetails.id,
-                          agreed_sale_value: bookingDetails.agreed_sale_value,
-                          booking_date: bookingDetails.booking_date,
-                          customer_name: bookingDetails.customer_name,
-                          customer_phone: bookingDetails.customer_phone,
-                          customer_pan: bookingDetails.customer_pan,
-                          customer_aadhaar: bookingDetails.customer_aadhaar,
-                          unit_number: selectedUnit.unit_number,
-                          project_name: matchedProj?.name || "",
-                          tower_name: matchedTower?.name || "",
-                          rera_number: matchedProj?.rera_number || null,
-                          co_applicants: bookingDetails.co_applicants,
-                        };
-                        handlePrintReceipt(item);
-                      };
+                {/* Action Buttons */}
+                <div className="flex gap-4 pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBookingOpen(false);
+                      setErrorMsg(null);
+                    }}
+                    className="flex-1 py-3 bg-slate-950 hover:bg-slate-850 active:bg-slate-900 border border-slate-800 text-slate-300 font-semibold rounded-xl transition-all text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all text-sm"
+                  >
+                    Confirm & Print Receipt
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
 
-                      return (
-                        <div key={rec.id} className="flex justify-between items-center bg-slate-950 hover:bg-slate-900 px-4 py-3 rounded-xl border border-slate-800/80 text-xs transition-colors">
-                          <div>
-                            <div className="font-bold text-slate-200">{rec.receipt_number}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">{rec.date} • {rec.payment_mode}</div>
+      {/* Booked Unit Details Modal Overlay */}
+      {
+        isDetailsOpen && selectedUnit && bookingDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in animate-duration-200">
+            <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-base font-bold text-slate-200">Booking Ledger & Details</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Unit {selectedUnit.unit_number} • {selectedUnit.configuration} • {
+                      projects.find(p => p.id === selectedUnit.project_id)?.name
+                    } ({
+                      projects.find(p => p.id === selectedUnit.project_id)?.towers.find(t => t.id === selectedUnit.tower_id)?.name
+                    })
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${selectedUnit.status === "Booked"
+                    ? "bg-amber-950/50 border-amber-500/50 text-amber-300"
+                    : "bg-purple-950/50 border-purple-500/50 text-purple-300"
+                    }`}>
+                    {selectedUnit.status}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      setErrorMsg(null);
+                      setSuccessMsg(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-900/60 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content - Two-column Grid (Scrollable) */}
+              <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Left Column: Customer Info & Receipt History */}
+                <div className="space-y-6">
+
+                  {/* Customer Details Card */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-3 shadow-md">
+                    <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Customer Profile</div>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <div className="text-[10px] text-slate-500 font-medium">Customer Name</div>
+                        <div className="font-semibold text-slate-200 text-sm mt-0.5">{bookingDetails.customer_name}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 font-medium">Contact Phone</div>
+                        <div className="font-semibold text-slate-200 text-sm mt-0.5">{bookingDetails.customer_phone}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 font-medium">PAN Number</div>
+                        <div className="font-semibold text-slate-200 uppercase mt-0.5">{bookingDetails.customer_pan}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 font-medium">Aadhaar Number</div>
+                        <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {bookingDetails.customer_aadhaar.slice(-4)}</div>
+                      </div>
+                    </div>
+
+                    {bookingDetails.co_applicants && bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').length > 0 && (
+                      <div className="border-t border-slate-805 pt-3 mt-3 space-y-3">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-455">Co-Applicant(s)</div>
+                        {bookingDetails.co_applicants.filter(c => c.role === 'Co-Applicant').map((co, idx) => (
+                          <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-slate-900 pb-2 last:border-b-0 last:pb-0">
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-medium">Name</div>
+                              <div className="font-semibold text-slate-200 mt-0.5">{co.name}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-medium">Phone</div>
+                              <div className="font-semibold text-slate-200 mt-0.5">{co.phone}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-medium">PAN Number</div>
+                              <div className="font-semibold text-slate-200 uppercase mt-0.5">{co.pan_number}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-medium">Aadhaar Number</div>
+                              <div className="font-semibold text-slate-200 mt-0.5">XXXX XXXX {co.aadhaar_number.slice(-4)}</div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-emerald-400">₹{rec.amount.toLocaleString("en-IN")}</span>
-                            <button
-                              type="button"
-                              onClick={handlePrint}
-                              className="p-1.5 bg-indigo-950/40 hover:bg-indigo-900 border border-indigo-500/20 hover:border-indigo-500/40 rounded-lg text-indigo-400 hover:text-indigo-200 transition-colors"
-                              title="Print Receipt PDF"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.75 19.5H17.25l-.72-5.671M6.72 13.829A9.006 9.006 0 0112 12.75c2.388 0 4.558.94 6.15 2.475" />
-                              </svg>
-                            </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Receipts Listing */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex justify-between items-center">
+                      <span>Receipt Ledger ({bookingDetails.receipts.length})</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Sorted oldest to newest</span>
+                    </div>
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {bookingDetails.receipts.map((rec) => {
+                        const handlePrint = () => {
+                          const matchedProj = projects.find((p) => p.id === selectedUnit.project_id);
+                          const matchedTower = matchedProj?.towers.find((t) => t.id === selectedUnit.tower_id);
+                          const item: ReceiptHistoryItem = {
+                            receipt_id: rec.id,
+                            receipt_number: rec.receipt_number,
+                            amount: rec.amount,
+                            payment_mode: rec.payment_mode,
+                            transaction_ref: rec.transaction_ref,
+                            date: rec.date,
+                            booking_id: bookingDetails.id,
+                            agreed_sale_value: bookingDetails.agreed_sale_value,
+                            booking_date: bookingDetails.booking_date,
+                            customer_name: bookingDetails.customer_name,
+                            customer_phone: bookingDetails.customer_phone,
+                            customer_pan: bookingDetails.customer_pan,
+                            customer_aadhaar: bookingDetails.customer_aadhaar,
+                            unit_number: selectedUnit.unit_number,
+                            project_name: matchedProj?.name || "",
+                            tower_name: matchedTower?.name || "",
+                            rera_number: matchedProj?.rera_number || null,
+                            co_applicants: bookingDetails.co_applicants,
+                          };
+                          handlePrintReceipt(item);
+                        };
+
+                        return (
+                          <div key={rec.id} className="flex justify-between items-center bg-slate-950 hover:bg-slate-900 px-4 py-3 rounded-xl border border-slate-800/80 text-xs transition-colors">
+                            <div>
+                              <div className="font-bold text-slate-200">{rec.receipt_number}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">{rec.date} • {rec.payment_mode}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-emerald-400">₹{rec.amount.toLocaleString("en-IN")}</span>
+                              <button
+                                type="button"
+                                onClick={handlePrint}
+                                className="p-1.5 bg-indigo-950/40 hover:bg-indigo-900 border border-indigo-500/20 hover:border-indigo-500/40 rounded-lg text-indigo-400 hover:text-indigo-200 transition-colors"
+                                title="Print Receipt PDF"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.75 19.5H17.25l-.72-5.671M6.72 13.829A9.006 9.006 0 0112 12.75c2.388 0 4.558.94 6.15 2.475" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Right Column: Financial Analysis & Progress Bar & Inline Form */}
+                <div className="space-y-6 flex flex-col">
+
+                  {/* Financial Summary & Visualization */}
+                  {(() => {
+                    const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
+                    const outstanding = bookingDetails.agreed_sale_value - totalPaid;
+
+                    // Compute percentages
+                    const paidPercentage = Math.min((totalPaid / bookingDetails.agreed_sale_value) * 100, 100);
+
+                    // Compute preview percentage
+                    const parsedPartAmount = parseFloat(partAmount);
+                    const validPartAmount = !isNaN(parsedPartAmount) && parsedPartAmount > 0 && parsedPartAmount <= outstanding + 0.01;
+                    const previewAmount = validPartAmount ? parsedPartAmount : 0;
+                    const previewPercentage = Math.min((previewAmount / bookingDetails.agreed_sale_value) * 100, 100 - paidPercentage);
+                    const pendingPercentage = Math.max(0, 100 - paidPercentage - previewPercentage);
+
+                    return (
+                      <div className="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4 shadow-md">
+                        <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Payment Ledger</div>
+
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Agreed Sale Value</span>
+                            <span className="font-bold text-slate-200 text-sm">₹{bookingDetails.agreed_sale_value.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Total Already Paid</span>
+                            <span className="font-bold text-emerald-400 text-sm">₹{totalPaid.toLocaleString("en-IN")} ({paidPercentage.toFixed(1)}%)</span>
+                          </div>
+                          {previewAmount > 0 && (
+                            <div className="flex justify-between text-indigo-400 font-semibold animate-pulse">
+                              <span>New Payment Preview</span>
+                              <span>+₹{previewAmount.toLocaleString("en-IN")} ({((previewAmount / bookingDetails.agreed_sale_value) * 100).toFixed(1)}%)</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between border-t border-slate-800/80 pt-2 text-slate-300">
+                            <span>Outstanding Balance</span>
+                            <span className={`font-bold text-sm ${outstanding - previewAmount > 0.01 ? "text-amber-400" : "text-emerald-500"}`}>
+                              ₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* Colored Segmented Progress Bar */}
+                        <div className="space-y-2 pt-2">
+                          <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
+                            <span>PAYMENT PROGRESS</span>
+                            <span>{((totalPaid + previewAmount) / bookingDetails.agreed_sale_value * 100).toFixed(1)}%</span>
+                          </div>
+
+                          {/* Bar Track */}
+                          <div className="w-full h-5 bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
+                            {/* Paid Segment */}
+                            {paidPercentage > 0 && (
+                              <div
+                                style={{ width: `${paidPercentage}%`, backgroundColor: "green" }}
+                                className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-300 relative group"
+                                title={`Already Paid: ${paidPercentage.toFixed(1)}%`}
+                              />
+                            )}
+
+                            {/* Preview Segment */}
+                            {previewPercentage > 0 && (
+                              <div
+                                style={{ width: `${previewPercentage}%` }}
+                                className="h-full bg-gradient-to-r from-indigo-600 to-indigo-500 animate-pulse transition-all duration-300 relative"
+                                title={`Preview: ${previewPercentage.toFixed(1)}%`}
+                              />
+                            )}
+
+                            {/* Pending Segment */}
+                            {pendingPercentage > 0 && (
+                              <div
+                                style={{ width: `${pendingPercentage}%` }}
+                                className="h-full bg-slate-800/60 transition-all duration-300"
+                                title={`Pending: ${pendingPercentage.toFixed(1)}%`}
+                              />
+                            )}
+                          </div>
+
+                          {/* Legend */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-slate-500 font-medium">
+                            <div className="flex items-center gap-1">
+                              <span className="w-2.5 h-2.5 rounded bg-emerald-500 block"></span>
+                              <span>Paid (₹{totalPaid.toLocaleString("en-IN")})</span>
+                            </div>
+                            {previewAmount > 0 && (
+                              <div className="flex items-center gap-1 text-indigo-400">
+                                <span className="w-2.5 h-2.5 rounded bg-indigo-500 block animate-pulse"></span>
+                                <span>Preview (₹{previewAmount.toLocaleString("en-IN")})</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <span className="w-2.5 h-2.5 rounded bg-slate-800 block"></span>
+                              <span>Pending (₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")})</span>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })()}
+
+                  {/* Inline Part Payment Form */}
+                  {showPartPaymentForm && (
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-4 shadow-md animate-fade-in shrink-0">
+                      <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Enter Payment Details</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-medium">Amount to Pay (₹)</label>
+                          <input
+                            type="number"
+                            required
+                            min={1}
+                            placeholder="Amount Paid Now"
+                            value={partAmount}
+                            onChange={(e) => setPartAmount(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-medium">Payment Mode</label>
+                          <select
+                            value={partPaymentMode}
+                            onChange={(e) => setPartPaymentMode(e.target.value as any)}
+                            className="w-full bg-slate-900 border border-slate-800 px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                          >
+                            <option value="RTGS">RTGS</option>
+                            <option value="IMPS">IMPS</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Cash">Cash</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-medium">Payment Date</label>
+                          <input
+                            type="date"
+                            required
+                            value={partPaymentDate}
+                            onChange={(e) => setPartPaymentDate(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                          />
+                        </div>
+                        {partPaymentMode !== "Cash" && (
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-[10px] text-slate-400 font-medium">Transaction Reference No / Cheque No</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="UTR / Ref Number"
+                              value={partTransactionRef}
+                              onChange={(e) => setPartTransactionRef(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPartPaymentForm(false);
+                            setErrorMsg(null);
+                          }}
+                          className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold rounded-lg transition-all text-xs"
+                        >
+                          Cancel Form
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePartPaymentSubmit}
+                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-lg shadow-md shadow-indigo-600/20 transition-all text-xs"
+                        >
+                          Submit Payment
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
               </div>
 
-              {/* Right Column: Financial Analysis & Progress Bar & Inline Form */}
-              <div className="space-y-6 flex flex-col">
+              {/* Modal Footer Actions */}
+              <div className="px-6 py-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center shrink-0">
 
-                {/* Financial Summary & Visualization */}
-                {(() => {
-                  const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
-                  const outstanding = bookingDetails.agreed_sale_value - totalPaid;
+                {/* Alert error panel inside modal */}
+                <div className="max-w-[50%] overflow-hidden truncate">
+                  {errorMsg && (
+                    <span className="text-red-400 font-medium text-xs flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500 shrink-0">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                      </svg>
+                      {errorMsg}
+                    </span>
+                  )}
+                  {successMsg && (
+                    <span className="text-emerald-400 font-medium text-xs flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-emerald-500 shrink-0">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {successMsg}
+                    </span>
+                  )}
+                </div>
 
-                  // Compute percentages
-                  const paidPercentage = Math.min((totalPaid / bookingDetails.agreed_sale_value) * 100, 100);
+                <div className="flex gap-3">
+                  {/* Main controls (only visible if inline form is NOT open) */}
+                  {!showPartPaymentForm && (() => {
+                    const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
+                    const outstanding = bookingDetails.agreed_sale_value - totalPaid;
 
-                  // Compute preview percentage
-                  const parsedPartAmount = parseFloat(partAmount);
-                  const validPartAmount = !isNaN(parsedPartAmount) && parsedPartAmount > 0 && parsedPartAmount <= outstanding + 0.01;
-                  const previewAmount = validPartAmount ? parsedPartAmount : 0;
-                  const previewPercentage = Math.min((previewAmount / bookingDetails.agreed_sale_value) * 100, 100 - paidPercentage);
-                  const pendingPercentage = Math.max(0, 100 - paidPercentage - previewPercentage);
+                    return (
+                      <>
+                        {outstanding > 0.01 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPartAmount(outstanding.toString());
+                              setPartTransactionRef("");
+                              setPartPaymentMode("RTGS");
+                              setShowPartPaymentForm(true);
+                              setErrorMsg(null);
+                              setSuccessMsg(null);
+                            }}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30 transition-all text-xs flex items-center gap-1.5"
+                          >
+                            Record Part Payment
+                          </button>
+                        ) : selectedUnit.status === "Booked" ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              //if (confirm(`Mark Unit ${selectedUnit.unit_number} as Registered?`)) {
+                              try {
+                                setLoading(true);
+                                await invoke("update_unit_status", { unitId: selectedUnit.id, status: "Registered" });
+                                setSuccessMsg(`Unit ${selectedUnit.unit_number} updated to Registered successfully.`);
 
-                  return (
-                    <div className="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4 shadow-md">
-                      <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Payment Ledger</div>
-
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Agreed Sale Value</span>
-                          <span className="font-bold text-slate-200 text-sm">₹{bookingDetails.agreed_sale_value.toLocaleString("en-IN")}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Total Already Paid</span>
-                          <span className="font-bold text-emerald-400 text-sm">₹{totalPaid.toLocaleString("en-IN")} ({paidPercentage.toFixed(1)}%)</span>
-                        </div>
-                        {previewAmount > 0 && (
-                          <div className="flex justify-between text-indigo-400 font-semibold animate-pulse">
-                            <span>New Payment Preview</span>
-                            <span>+₹{previewAmount.toLocaleString("en-IN")} ({((previewAmount / bookingDetails.agreed_sale_value) * 100).toFixed(1)}%)</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between border-t border-slate-800/80 pt-2 text-slate-300">
-                          <span>Outstanding Balance</span>
-                          <span className={`font-bold text-sm ${outstanding - previewAmount > 0.01 ? "text-amber-400" : "text-emerald-500"}`}>
-                            ₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Colored Segmented Progress Bar */}
-                      <div className="space-y-2 pt-2">
-                        <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
-                          <span>PAYMENT PROGRESS</span>
-                          <span>{((totalPaid + previewAmount) / bookingDetails.agreed_sale_value * 100).toFixed(1)}%</span>
-                        </div>
-
-                        {/* Bar Track */}
-                        <div className="w-full h-5 bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
-                          {/* Paid Segment */}
-                          {paidPercentage > 0 && (
-                            <div
-                              style={{ width: `${paidPercentage}%`, backgroundColor: "green" }}
-                              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-300 relative group"
-                              title={`Already Paid: ${paidPercentage.toFixed(1)}%`}
-                            />
-                          )}
-
-                          {/* Preview Segment */}
-                          {previewPercentage > 0 && (
-                            <div
-                              style={{ width: `${previewPercentage}%` }}
-                              className="h-full bg-gradient-to-r from-indigo-600 to-indigo-500 animate-pulse transition-all duration-300 relative"
-                              title={`Preview: ${previewPercentage.toFixed(1)}%`}
-                            />
-                          )}
-
-                          {/* Pending Segment */}
-                          {pendingPercentage > 0 && (
-                            <div
-                              style={{ width: `${pendingPercentage}%` }}
-                              className="h-full bg-slate-800/60 transition-all duration-300"
-                              title={`Pending: ${pendingPercentage.toFixed(1)}%`}
-                            />
-                          )}
-                        </div>
-
-                        {/* Legend */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-slate-500 font-medium">
-                          <div className="flex items-center gap-1">
-                            <span className="w-2.5 h-2.5 rounded bg-emerald-500 block"></span>
-                            <span>Paid (₹{totalPaid.toLocaleString("en-IN")})</span>
-                          </div>
-                          {previewAmount > 0 && (
-                            <div className="flex items-center gap-1 text-indigo-400">
-                              <span className="w-2.5 h-2.5 rounded bg-indigo-500 block animate-pulse"></span>
-                              <span>Preview (₹{previewAmount.toLocaleString("en-IN")})</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <span className="w-2.5 h-2.5 rounded bg-slate-800 block"></span>
-                            <span>Pending (₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")})</span>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  );
-                })()}
-
-                {/* Inline Part Payment Form */}
-                {showPartPaymentForm && (
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-4 shadow-md animate-fade-in shrink-0">
-                    <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Enter Payment Details</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-medium">Amount to Pay (₹)</label>
-                        <input
-                          type="number"
-                          required
-                          min={1}
-                          placeholder="Amount Paid Now"
-                          value={partAmount}
-                          onChange={(e) => setPartAmount(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-medium">Payment Mode</label>
-                        <select
-                          value={partPaymentMode}
-                          onChange={(e) => setPartPaymentMode(e.target.value as any)}
-                          className="w-full bg-slate-900 border border-slate-800 px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                        >
-                          <option value="RTGS">RTGS</option>
-                          <option value="IMPS">IMPS</option>
-                          <option value="Cheque">Cheque</option>
-                          <option value="Cash">Cash</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-medium">Payment Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={partPaymentDate}
-                          onChange={(e) => setPartPaymentDate(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 px-2 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                        />
-                      </div>
-                      {partPaymentMode !== "Cash" && (
-                        <div className="space-y-1 sm:col-span-2">
-                          <label className="text-[10px] text-slate-400 font-medium">Transaction Reference No / Cheque No</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="UTR / Ref Number"
-                            value={partTransactionRef}
-                            onChange={(e) => setPartTransactionRef(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPartPaymentForm(false);
-                          setErrorMsg(null);
-                        }}
-                        className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold rounded-lg transition-all text-xs"
-                      >
-                        Cancel Form
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePartPaymentSubmit}
-                        className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-lg shadow-md shadow-indigo-600/20 transition-all text-xs"
-                      >
-                        Submit Payment
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="px-6 py-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center shrink-0">
-
-              {/* Alert error panel inside modal */}
-              <div className="max-w-[50%] overflow-hidden truncate">
-                {errorMsg && (
-                  <span className="text-red-400 font-medium text-xs flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500 shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                    {errorMsg}
-                  </span>
-                )}
-                {successMsg && (
-                  <span className="text-emerald-400 font-medium text-xs flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-emerald-500 shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {successMsg}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                {/* Main controls (only visible if inline form is NOT open) */}
-                {!showPartPaymentForm && (() => {
-                  const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
-                  const outstanding = bookingDetails.agreed_sale_value - totalPaid;
-
-                  return (
-                    <>
-                      {outstanding > 0.01 ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPartAmount(outstanding.toString());
-                            setPartTransactionRef("");
-                            setPartPaymentMode("RTGS");
-                            setShowPartPaymentForm(true);
-                            setErrorMsg(null);
-                            setSuccessMsg(null);
-                          }}
-                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30 transition-all text-xs flex items-center gap-1.5"
-                        >
-                          Record Part Payment
-                        </button>
-                      ) : selectedUnit.status === "Booked" ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            //if (confirm(`Mark Unit ${selectedUnit.unit_number} as Registered?`)) {
-                            try {
-                              setLoading(true);
-                              await invoke("update_unit_status", { unitId: selectedUnit.id, status: "Registered" });
-                              setSuccessMsg(`Unit ${selectedUnit.unit_number} updated to Registered successfully.`);
-
-                              // Reload map
-                              const propertyMap: Project[] = await invoke("get_property_map");
-                              setProjects(propertyMap);
-                              // update selection state
-                              const updatedUnit = propertyMap
-                                .flatMap(p => p.towers.flatMap(t => t.units))
-                                .find(u => u.id === selectedUnit.id);
-                              if (updatedUnit) {
-                                setSelectedUnit(updatedUnit);
-                                const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: updatedUnit.id });
-                                setBookingDetails(details);
+                                // Reload map
+                                const propertyMap: Project[] = await invoke("get_property_map");
+                                setProjects(propertyMap);
+                                // update selection state
+                                const updatedUnit = propertyMap
+                                  .flatMap(p => p.towers.flatMap(t => t.units))
+                                  .find(u => u.id === selectedUnit.id);
+                                if (updatedUnit) {
+                                  setSelectedUnit(updatedUnit);
+                                  const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: updatedUnit.id });
+                                  setBookingDetails(details);
+                                }
+                              } catch (err: any) {
+                                console.error(err);
+                                setErrorMsg(err.toString() || "Failed to update unit status.");
+                              } finally {
+                                setLoading(false);
                               }
-                            } catch (err: any) {
-                              console.error(err);
-                              setErrorMsg(err.toString() || "Failed to update unit status.");
-                            } finally {
-                              setLoading(false);
-                            }
-                            //}
-                          }}
-                          className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-semibold shadow-lg shadow-purple-600/30 transition-all text-xs flex items-center gap-1.5"
-                        >
-                          Mark as Registered
-                        </button>
-                      ) : null}
-                    </>
-                  );
-                })()}
+                              //}
+                            }}
+                            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-semibold shadow-lg shadow-purple-600/30 transition-all text-xs flex items-center gap-1.5"
+                          >
+                            Mark as Registered
+                          </button>
+                        ) : null}
+                      </>
+                    );
+                  })()}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    setErrorMsg(null);
-                    setSuccessMsg(null);
-                  }}
-                  className="px-5 py-2.5 bg-slate-950 hover:bg-slate-850 active:bg-slate-900 border border-slate-800 text-slate-300 font-semibold rounded-xl transition-all text-xs"
-                >
-                  Close details
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      setErrorMsg(null);
+                      setSuccessMsg(null);
+                    }}
+                    className="px-5 py-2.5 bg-slate-950 hover:bg-slate-850 active:bg-slate-900 border border-slate-800 text-slate-300 font-semibold rounded-xl transition-all text-xs"
+                  >
+                    Close details
+                  </button>
+                </div>
+
               </div>
 
             </div>
-
           </div>
-        </div>
-      )}
+        )
+      }
 
 
       {/* ============================================================
@@ -1972,7 +2032,7 @@ function App() {
           );
         })()}
       </div>
-    </div>
+    </div >
   );
 }
 
