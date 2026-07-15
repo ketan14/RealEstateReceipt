@@ -774,7 +774,7 @@ function App() {
 
                                 {/* Unit Grid (collapsible) */}
                                 {isExpanded && (
-                                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                  <div className="flex flex-wrap gap-4 p-4">
                                     {tower.units.map((unit) => {
                                       const isSelected = selectedUnit?.id === unit.id;
                                       const statusStyles = {
@@ -790,15 +790,13 @@ function App() {
                                         <button
                                           key={unit.id}
                                           onClick={() => selectUnitForBooking(unit)}
-                                          className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all duration-200 transform hover:-translate-y-0.5 active:scale-95 ${statusStyles} ${isSelected
+                                          className={`flex-1 min-w-[200px] max-w-[250px] rounded-xl bg-slate-900 border border-slate-700 shadow-md p-4 flex flex-col justify-between rounded-xl bg-slate-900 border border-slate-700 shadow-md p-4 flex flex-col justify-between transition-all duration-200 transform hover:-translate-y-0.5 active:scale-95 ${statusStyles} ${isSelected
                                             ? "ring-2 ring-indigo-500 scale-102 border-indigo-400 shadow-md shadow-indigo-500/10"
                                             : ""
                                             }`}
                                         >
                                           <div className="flex justify-between items-start w-full">
-                                            <span className="text-sm font-bold">
-                                              {unit.unit_number}
-                                            </span>
+                                            <span className="text-sm font-bold">{unit.unit_number}</span>
                                             <span className="text-[10px] font-medium bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">
                                               {unit.configuration}
                                             </span>
@@ -810,6 +808,7 @@ function App() {
                                       );
                                     })}
                                   </div>
+
                                 )}
                               </div>
                             );
