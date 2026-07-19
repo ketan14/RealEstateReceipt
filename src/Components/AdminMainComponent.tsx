@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Project } from "../types";
 import { createProject, deleteProject, getProjects, updateProject } from "../api/projects";
 import ProjectDetail from "./ProjectDetail";
+import { invoke } from "@tauri-apps/api/core";
+
 export default function AdminDashboard({ projectsRef }: { projectsRef: Project[] }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -61,11 +63,32 @@ export default function AdminDashboard({ projectsRef }: { projectsRef: Project[]
 
 
 
+
+  const handleBackup = async () => {
+    try {
+      const backupPath: string = await invoke("create_backup");
+      alert(`Backup successful! Saved to: ${backupPath}`);
+    } catch (err: any) {
+      alert(`Backup failed: ${err.toString()}`);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {selectedProjectId === null ? (
         <div className="space-y-6 h-full flex flex-col">
-          <h2 className="text-lg font-bold text-slate-200">Projects</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-slate-200">Projects</h2>
+            <button
+              onClick={handleBackup}
+              className="px-4 py-2 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white transition-colors text-sm font-semibold flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Backup Database
+            </button>
+          </div>
 
           {/* Container with scrollable list */}
           <div className="flex-1 p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col">

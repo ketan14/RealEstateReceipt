@@ -34,8 +34,8 @@ These reduce architectural debt and unlock day-to-day usability improvements the
 
 | # | Item | Why it matters | Rough effort |
 |---|---|---|---|
-| 2.0 | **Admin panel — CRUD management for Projects, Towers, Units, and Customers** — a dedicated Settings/Admin section (protected behind the password gate from 1.1) with forms to create, edit, and soft-delete records across all four entities; separate from the sales-facing Property Explorer | Currently there is no UI to add a new project, tower, or unit — data must be seeded directly into SQLite by a developer. Any new project launch requires technical intervention, which is a critical usability gap before handing the app to non-technical staff | Medium |
-| 2.1 | **Refactor `App.tsx` monolith** into `ExplorerTab`, `BookingModal`, `ReceiptLedger`, shared hooks (`useReceiptData`, `usePropertyMap`) | Already flagged in the architecture review at ~1,800 lines; will only get harder to maintain | Medium–Large |
+| 2.0 | ~~**Admin panel — CRUD management for Projects, Towers, Units, and Customers** — a dedicated Settings/Admin section (protected behind the password gate from 1.1) with forms to create, edit, and soft-delete records across all four entities; separate from the sales-facing Property Explorer~~ | ~~Currently there is no UI to add a new project, tower, or unit — data must be seeded directly into SQLite by a developer. Any new project launch requires technical intervention, which is a critical usability gap before handing the app to non-technical staff~~ | ✅ Completed |
+| 2.1 | ~~**Refactor `App.tsx` monolith** into `ExplorerTab`, `BookingModal`, `ReceiptLedger`, shared hooks (`useReceiptData`, `usePropertyMap`)~~ | ~~Already flagged in the architecture review at ~1,800 lines; will only get harder to maintain~~ | ✅ Completed |
 | 2.2 | **Native PDF generation in Rust** (`printpdf` or `wkhtmltopdf` binding) instead of browser-print round-trip | Enables silent/batch printing, email attachment, no extra browser window | Medium |
 | 2.3 | **CSV/Excel export** of receipt ledger and customer list | Needed for handoff to accountants/auditors | Small |
 | 2.4 | **Document attachments** (agreement copy, ID proof, cheque image) linked to booking/receipt | Commonly required for compliance and dispute resolution | Medium |
@@ -118,7 +118,7 @@ Bigger architectural decisions that should be flagged early even if not built so
 
 1. **Before the first real booking is entered**: finalize the receipt numbering scheme (1.6), the `booking_customers` junction table for multi-property/joint buyers (1.7), and the RERA fields on `projects` (1.8). All three are one-way doors — they can't be retrofitted later without breaking reconciliation, migrating live data, or reprinting already-issued receipts.
 2. **Sprint 1–2**: remaining Tier 1 items (auth, backups, audit columns, void flow, encryption) — foundational risk fixes that can still be added safely after go-live, but are cheaper to do now.
-3. **Sprint 3–5**: Tier 2 items, starting with the `App.tsx` refactor since it makes every subsequent feature easier to build safely. Customer profile view (2.5/2.6) should follow shortly after, once 1.7 is in place.
+3. **Sprint 3–5**: Remaining Tier 2 items. The `App.tsx` refactor is now complete, which makes every subsequent feature easier to build safely. Customer profile view (2.5/2.6) should follow shortly after, once 1.7 is in place.
 4. **Ongoing backlog**: Tier 3 items, prioritized by actual user requests from the sales/accounts team. GST/TDS fields (3.2) should be confirmed with the client's CA before implementation, since incorrect tax computation is a compliance and trust risk.
 5. **Revisit Tier 4** only when there's a concrete business driver (e.g., a second office location forcing the multi-user question).
 

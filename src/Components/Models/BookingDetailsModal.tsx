@@ -28,6 +28,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
     const [partPaymentDate, setPartPaymentDate] = useState(new Date().toISOString().split("T")[0]);
 
     const loadData = useAppStore((state) => state.loadData);
+    const updateUnitStatus = useAppStore((state) => state.updateUnitStatus);
 
     const handlePartPaymentSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -90,6 +91,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                 tower_name: matchedTower?.name || "",
                 rera_number: matchedProj?.rera_number || null,
                 co_applicants: bookingDetails.co_applicants,
+                status: selectedUnit.status,
             };
 
             // Reload dataset
@@ -232,6 +234,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                                             tower_name: matchedTower?.name || "",
                                             rera_number: matchedProj?.rera_number || null,
                                             co_applicants: bookingDetails.co_applicants,
+                                            status: selectedUnit.status,
                                         };
                                         // handlePrintReceipt(item);
                                         try {
@@ -484,9 +487,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                             const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
                             const outstanding = bookingDetails.agreed_sale_value - totalPaid;
 
-                            function updateUnitStatus(id: number, arg1: string) {
-                                throw new Error("Function not implemented.");
-                            }
+
 
                             return (
                                 <>
@@ -512,6 +513,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                                                 try {
                                                     await updateUnitStatus(selectedUnit.id, "Registered");
                                                     // Optional: Handle success message via a local state or a "toast"
+                                                    onClose();
                                                 } catch (err: any) {
                                                     console.error(err);
                                                     setErrorMsgFromModal(err.toString() || "Failed to update unit status.");

@@ -44,7 +44,9 @@ export const ReceiptLedgerView = ({ receipts, handlePrint }: { receipts: Receipt
                 }
 
                 // Accumulate total paid amount and push the receipt into sub-records
-                acc[key].total_amount_paid += item.amount;
+                if (item.status === 'Active') {
+                    acc[key].total_amount_paid += item.amount;
+                }
                 acc[key].all_receipts.push(item);
 
                 return acc;

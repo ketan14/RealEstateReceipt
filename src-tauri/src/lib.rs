@@ -1,4 +1,5 @@
 mod db;
+mod crypto;
 mod commands;
 use tauri::Manager;
 
@@ -25,6 +26,7 @@ pub fn run() {
             commands::get_booking_details_by_unit,
             commands::create_additional_receipt,
             commands::update_unit_status,
+            commands::void_receipt,
             // existing commands...
             commands::create_project,
             commands::get_projects,
@@ -42,6 +44,14 @@ pub fn run() {
             commands::get_units,
             commands::update_unit,
             commands::delete_unit,
+
+            // auth commands
+            commands::is_pin_setup,
+            commands::setup_pin,
+            commands::verify_pin,
+            
+            // backup commands
+            commands::create_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
