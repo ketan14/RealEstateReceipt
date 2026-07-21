@@ -218,6 +218,63 @@ async fn apply_migrations(pool: &SqlitePool) -> Result<(), String> {
             WHERE id NOT IN (SELECT booking_id FROM booking_customers);
             "#,
         ]),
+        // Phase 1.1 — Local Authentication settings
+        ("004_create_settings_table", vec![
+            r#"
+            CREATE TABLE IF NOT EXISTS settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                pin_hash TEXT
+            );
+            "#,
+            r#"
+            INSERT OR IGNORE INTO settings (id, pin_hash) VALUES (1, NULL);
+            "#,
+        ]),
+        // Phase 1.3 — Audit trail columns
+        ("005_add_audit_columns", vec![
+                "ALTER TABLE projects ADD COLUMN created_at TEXT",
+                "ALTER TABLE projects ADD COLUMN updated_at TEXT",
+
+                "ALTER TABLE towers ADD COLUMN created_at TEXT",
+                "ALTER TABLE towers ADD COLUMN updated_at TEXT",
+
+                "ALTER TABLE units ADD COLUMN created_at TEXT",
+                "ALTER TABLE units ADD COLUMN updated_at TEXT",
+
+                "ALTER TABLE customers ADD COLUMN created_at TEXT",
+                "ALTER TABLE customers ADD COLUMN updated_at TEXT",
+
+                "ALTER TABLE bookings ADD COLUMN created_at TEXT",
+                "ALTER TABLE bookings ADD COLUMN updated_at TEXT",
+
+                "ALTER TABLE receipts ADD COLUMN created_at TEXT",
+                "ALTER TABLE receipts ADD COLUMN updated_at TEXT",
+
+                // Populate existing rows
+                "UPDATE projects SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+                "UPDATE towers SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE towers SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+                "UPDATE units SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE units SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+                "UPDATE customers SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE customers SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+                "UPDATE bookings SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE bookings SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+                "UPDATE receipts SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+                "UPDATE receipts SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+
+        ]),
+        // Phase 1.4 — Receipt void/reversal flow
+        ("006_add_receipt_status", vec![
+            "ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active', 'Voided'))",
+            "ALTER TABLE receipts ADD COLUMN void_reason TEXT",
+        ]),
     ];
 
     for (name, queries) in migrations {
@@ -242,12 +299,48 @@ async fn apply_migrations(pool: &SqlitePool) -> Result<(), String> {
                 .map_err(|e| format!("Migration '{}' failed: {} — Query: {}", name, e, query))?;
         }
 
-        // Mark as applied
         sqlx::query("INSERT INTO _migrations (name) VALUES (?)")
             .bind(name)
             .execute(pool)
             .await
             .map_err(|e| format!("Failed to record migration '{}': {}", name, e))?;
+    }
+
+    // Phase 1.5 — Encrypt existing customer data
+    let applied_007: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _migrations WHERE name = '007_encrypt_customer_data'")
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        
+    if applied_007 == 0 {
+        use sqlx::Row;
+        // Fetch all customers
+        let customers = sqlx::query("SELECT id, pan_number, aadhaar_number FROM customers")
+            .fetch_all(pool)
+            .await
+            .map_err(|e| e.to_string())?;
+            
+        for row in customers {
+            let id: i64 = row.get("id");
+            let pan: String = row.get("pan_number");
+            let aadhaar: String = row.get("aadhaar_number");
+            
+            let enc_pan = crate::crypto::encrypt(&pan)?;
+            let enc_aadhaar = crate::crypto::encrypt(&aadhaar)?;
+            
+            sqlx::query("UPDATE customers SET pan_number = ?, aadhaar_number = ? WHERE id = ?")
+                .bind(enc_pan)
+                .bind(enc_aadhaar)
+                .bind(id)
+                .execute(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        
+        sqlx::query("INSERT INTO _migrations (name) VALUES ('007_encrypt_customer_data')")
+            .execute(pool)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())

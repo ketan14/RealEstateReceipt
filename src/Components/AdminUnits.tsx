@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { getUnits, createUnit, updateUnit, deleteUnit } from "../api/units.ts";
 import { Tower, Unit, UnitCSVRow } from "../types/index.ts";
 import { getTowers } from "../api/towers.ts";
@@ -178,19 +178,6 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
     });
   };
 
-  const groupedUnits = useMemo(() => {
-    return units.reduce((acc, u) => {
-      (acc[u.tower_id] ||= []).push(u);
-      return acc;
-    }, {} as Record<number, Unit[]>);
-  }, [units]);
-  const toggleTower = (towerId: number) => {
-    setExpandedTowers((prev) =>
-      prev.includes(towerId)
-        ? prev.filter((id) => id !== towerId)
-        : [...prev, towerId]
-    );
-  };
 
   const getTowerName = (towerId: string) => {
     const tower = towers.find((t) => t.id === Number(towerId));

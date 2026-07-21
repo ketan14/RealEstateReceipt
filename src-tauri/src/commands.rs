@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, Row};
 use tauri::{Manager, State};
 use chrono::{NaiveDate, Datelike};
+use bcrypt::{hash, verify, DEFAULT_COST};
 
 //use crate::towers::{self, Tower};
 //use crate::units::{self, Unit};
@@ -78,6 +79,8 @@ pub struct ReceiptHistoryItem {
     pub payment_mode: String,
     pub transaction_ref: String,
     pub date: String,
+    pub status: String,
+    pub void_reason: Option<String>,
     pub booking_id: i64,
     pub agreed_sale_value: f64,
     pub booking_date: String,
@@ -425,6 +428,8 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             r.payment_mode,
             r.transaction_ref,
             r.date,
+            r.status,
+            r.void_reason,
             b.id as booking_id,
             b.agreed_sale_value,
             b.booking_date,
@@ -494,6 +499,8 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             payment_mode: row.get("payment_mode"),
             transaction_ref: row.get("transaction_ref"),
             date: row.get("date"),
+            status: row.get("status"),
+            void_reason: row.get("void_reason"),
             booking_id,
             agreed_sale_value: row.get("agreed_sale_value"),
             booking_date: row.get("booking_date"),
@@ -559,6 +566,8 @@ pub struct ReceiptItem {
     pub payment_mode: String,
     pub transaction_ref: String,
     pub date: String,
+    pub status: String,
+    pub void_reason: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -626,7 +635,9 @@ pub async fn get_booking_details_by_unit(
                     amount,
                     payment_mode,
                     transaction_ref,
-                    date
+                    date,
+                    status,
+                    void_reason
                 FROM receipts
                 WHERE booking_id = ?
                 ORDER BY id ASC
@@ -646,6 +657,8 @@ pub async fn get_booking_details_by_unit(
                     payment_mode: r_row.get("payment_mode"),
                     transaction_ref: r_row.get("transaction_ref"),
                     date: r_row.get("date"),
+                    status: r_row.get("status"),
+                    void_reason: r_row.get("void_reason"),
                 });
             }
 
@@ -731,8 +744,8 @@ pub async fn create_additional_receipt(
     let agreed_sale_value: f64 = booking_row.get("agreed_sale_value");
     let unit_project_id: i64 = booking_row.get("project_id");
 
-    // 2. Get total amount paid so far
-    let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0.0) FROM receipts WHERE booking_id = ?")
+    // 2. Get total amount paid so far (exclude voided receipts)
+    let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0.0) FROM receipts WHERE booking_id = ? AND status = 'Active'")
         .bind(booking_id)
         .fetch_one(&mut *tx)
         .await
@@ -1026,5 +1039,107 @@ pub async fn delete_unit(state: State<'_, DbState>, id: i64) -> Result<(), Strin
         .execute(pool)
         .await
         .map_err(|e| format!("Failed to delete unit: {}", e))?;
+    Ok(())
+}
+
+// ─── Authentication ────────────────────────────────────────────────────────
+#[tauri::command]
+pub async fn is_pin_setup(state: State<'_, DbState>) -> Result<bool, String> {
+    let pin_hash: Option<String> = sqlx::query_scalar("SELECT pin_hash FROM settings WHERE id = 1")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    Ok(pin_hash.is_some())
+}
+
+#[tauri::command]
+pub async fn setup_pin(pin: String, state: State<'_, DbState>) -> Result<(), String> {
+    if pin.trim().is_empty() {
+        return Err("PIN cannot be empty".to_string());
+    }
+    let hashed = hash(pin, DEFAULT_COST).map_err(|e| format!("Failed to hash PIN: {}", e))?;
+    sqlx::query("UPDATE settings SET pin_hash = ? WHERE id = 1")
+        .bind(hashed)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn verify_pin(pin: String, state: State<'_, DbState>) -> Result<bool, String> {
+    let pin_hash: Option<String> = sqlx::query_scalar("SELECT pin_hash FROM settings WHERE id = 1")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+        
+    if let Some(h) = pin_hash {
+        let valid = verify(pin, &h).unwrap_or(false);
+        Ok(valid)
+    } else {
+        Err("PIN is not set up".to_string())
+    }
+}
+
+// ─── Backups ────────────────────────────────────────────────────────
+#[tauri::command]
+pub async fn create_backup(app: tauri::AppHandle) -> Result<String, String> {
+    use std::fs;
+    
+    // Get the source DB path
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    let db_path = app_data_dir.join("real_estate_erp.db");
+
+    // Ensure it exists
+    if !db_path.exists() {
+        return Err("Database file not found. Nothing to backup.".to_string());
+    }
+
+    // Get the backup directory
+    let docs_dir = app
+        .path()
+        .document_dir()
+        .map_err(|e| format!("Failed to get documents directory: {}", e))?;
+    
+    let backup_dir = docs_dir.join("RealEstateERP_Backups");
+    fs::create_dir_all(&backup_dir).map_err(|e| format!("Failed to create backup dir: {}", e))?;
+
+    // Create a timestamped backup name
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+    let backup_filename = format!("real_estate_erp_{}.db", timestamp);
+    let backup_path = backup_dir.join(&backup_filename);
+
+    // Copy the file
+    fs::copy(&db_path, &backup_path).map_err(|e| format!("Failed to copy DB file: {}", e))?;
+
+    Ok(backup_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn void_receipt(
+    receipt_id: i64,
+    reason: String,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
+    let pool = &state.pool;
+    
+    if reason.trim().is_empty() {
+        return Err("Void reason cannot be empty.".to_string());
+    }
+
+    let affected = sqlx::query("UPDATE receipts SET status = 'Voided', void_reason = ? WHERE id = ?")
+        .bind(&reason)
+        .bind(receipt_id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to void receipt: {}", e))?;
+
+    if affected.rows_affected() == 0 {
+        return Err("Receipt not found.".to_string());
+    }
+
     Ok(())
 }

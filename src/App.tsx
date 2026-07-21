@@ -12,8 +12,44 @@ import { printReceipt } from "./Components/utils/receiptHandler";
 import { ReceiptLedgerView } from "./Components/Dashboard/ledger/ReceiptLedgerView";
 import { BookingModal } from "./Components/Models/BookingModal";
 import { BookingDetailsModal } from "./Components/Models/BookingDetailsModal";
+import { LockScreen } from "./Components/Auth/LockScreen";
 
 function App() {
+  // Authentication State
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  // Auto-lock on inactivity and automated backup
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      // Lock after 15 minutes of inactivity (900000 ms)
+      if (isUnlocked) {
+        timeoutId = setTimeout(() => setIsUnlocked(false), 900000);
+      }
+    };
+
+    if (isUnlocked) {
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keypress', resetTimer);
+      window.addEventListener('click', resetTimer);
+      window.addEventListener('scroll', resetTimer);
+      resetTimer();
+
+      // Trigger automatic backup on successful unlock (once per session)
+      invoke("create_backup").catch(e => console.error("Automated backup failed:", e));
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keypress', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+    };
+  }, [isUnlocked]);
+
   // Navigation & View State
 
   const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin">("explorer");
@@ -107,6 +143,9 @@ function App() {
     }
   }, [activeTab]);
 
+  if (!isUnlocked) {
+    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
@@ -137,8 +176,8 @@ function App() {
               />
               <UnitDetailsPanel
                 selectedUnit={selectedUnit}
-                onInitiateBooking={() => setIsBookingOpen(true)}
-                onViewDetails={() => setIsDetailsOpen(true)}
+                setIsBookingOpenFromParent={(msg: boolean) => setIsBookingOpen(msg)}
+                setIsDetailsOpenFromParent={(msg: boolean) => setIsDetailsOpen(msg)}
                 stats={{ bookingsCount: uniqueCombinations.length, revenue: receipts.reduce((a, r) => a + r.amount, 0) }}
               />
             </div>

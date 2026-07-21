@@ -24,10 +24,13 @@ export const ReceiptTable = ({ groups, onPrint }: { groups: GroupedReceipt[], on
                         <td className="px-6 py-4 max-w-[220px]">
                             <div className="space-y-3">
                                 {group.all_receipts.map((receipt) => (
-                                    <div key={receipt.receipt_id} className="border-l-2 border-indigo-500/40 pl-2">
-                                        <div className="font-bold text-slate-200 text-xs">{receipt.receipt_number}</div>
+                                    <div key={receipt.receipt_id} className={`border-l-2 pl-2 ${receipt.status === 'Voided' ? 'border-red-500/40 opacity-70' : 'border-indigo-500/40'}`}>
+                                        <div className={`font-bold text-xs ${receipt.status === 'Voided' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                                            {receipt.receipt_number}
+                                            {receipt.status === 'Voided' && <span className="ml-2 text-[9px] uppercase bg-red-900/30 text-red-400 px-1 rounded">Voided</span>}
+                                        </div>
                                         <div className="text-[10px] text-slate-400 font-medium">{receipt.date}</div>
-                                        <div className="text-[10px] text-indigo-400 flex items-center gap-1 mt-0.5">
+                                        <div className={`text-[10px] flex items-center gap-1 mt-0.5 ${receipt.status === 'Voided' ? 'text-red-400/70' : 'text-indigo-400'}`}>
                                             <span className="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded font-medium text-[9px]">
                                                 {receipt.payment_mode}
                                             </span>
@@ -72,14 +75,13 @@ export const ReceiptTable = ({ groups, onPrint }: { groups: GroupedReceipt[], on
                         {/* Column 6: Print Actions (Renders print buttons stacked for each item) */}
                         <td className="px-6 py-4 text-center">
                             <div className="flex flex-col items-center gap-1.5">
-                                {group.all_receipts.map((receipt) => (
+                                {group.all_receipts.filter(r => r.status === 'Active').map((receipt) => (
                                     <button
                                         key={receipt.receipt_id}
                                         onClick={async () => {
                                             try {
                                                 await printReceipt(receipt);
                                             } catch (err: any) {
-                                                // You can now handle the error globally or locally
                                                 console.log("Print failed:", err);
                                             }
                                         }}

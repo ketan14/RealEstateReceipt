@@ -59,6 +59,8 @@ export interface ReceiptHistoryItem {
   payment_mode: 'Cash' | 'Cheque' | 'RTGS' | 'IMPS';
   transaction_ref: string;
   date: string;
+  status: string;
+  void_reason?: string | null;
   booking_id: number;
   agreed_sale_value: number;
   booking_date: string;
@@ -80,6 +82,8 @@ export interface ReceiptItem {
   payment_mode: 'Cash' | 'Cheque' | 'RTGS' | 'IMPS';
   transaction_ref: string;
   date: string;
+  status: string;
+  void_reason?: string | null;
 }
 
 export interface BookingCustomerInfo {
