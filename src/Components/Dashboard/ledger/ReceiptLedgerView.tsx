@@ -4,7 +4,7 @@ import { ReceiptTable } from "./ReceiptTable";
 import { GroupedReceipt, ReceiptHistoryItem } from "../../../types";
 
 // components/ledger/ReceiptLedgerView.tsx
-export const ReceiptLedgerView = ({ receipts, handlePrint }: { receipts: ReceiptHistoryItem[], handlePrint: any }) => {
+export const ReceiptLedgerView = ({ receipts }: { receipts: ReceiptHistoryItem[] }) => {
     const [search, setSearch] = useState("");
     const [mode, setMode] = useState("All");
 
@@ -61,7 +61,7 @@ export const ReceiptLedgerView = ({ receipts, handlePrint }: { receipts: Receipt
                 searchQuery={search} onSearchChange={setSearch}
                 filterMode={mode} onModeChange={setMode}
             />
-            <ReceiptTable groups={filteredData} onPrint={handlePrint} />
+            <ReceiptTable groups={filteredData} />
         </div>
     );
 };
