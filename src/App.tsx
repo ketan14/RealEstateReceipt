@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Unit, ReceiptHistoryItem, BookingDetails } from "./types";
 import "./App.css";
@@ -8,7 +8,6 @@ import { ErrorBanner, LoadingSpinner, SuccessBanner } from "./Components/UI/Stat
 import { Header } from "./Components/UI/Header";
 import { PropertyMap } from "./Components/Dashboard/PropertyExplorer";
 import { UnitDetailsPanel } from "./Components/Dashboard/UnitDetailsPanel";
-import { printReceipt } from "./Components/utils/receiptHandler";
 import { ReceiptLedgerView } from "./Components/Dashboard/ledger/ReceiptLedgerView";
 import { BookingModal } from "./Components/Models/BookingModal";
 import { BookingDetailsModal } from "./Components/Models/BookingDetailsModal";
@@ -117,6 +116,8 @@ function App() {
       try {
         //setLoading(true);
         const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: unit.id });
+        debugger;
+        console.timeLog('details', details)
         setBookingDetails(details);
         setIsDetailsOpen(true);
       } catch (err: any) {
@@ -187,7 +188,6 @@ function App() {
         {activeTab === "history" && !loading && (
           <ReceiptLedgerView
             receipts={receipts}
-            handlePrint={printReceipt}
           />
         )}
         {/* Tab 3: Admin */}

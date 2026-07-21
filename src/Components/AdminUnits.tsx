@@ -19,7 +19,6 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [fileData, setFileData] = useState<Unit[]>([])
   const [errors, setErrors] = useState<string[]>([]); const [mode, setMode] = useState<"single" | "bulk" | "bulkCustom">("single");
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -364,7 +363,6 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
                     <ul>{errors.map((err, idx) => <li key={idx}>{err}</li>)}</ul>
                   </div>
                 )}
-                <h4 className="text-slate-300">Parsed Rows: {fileData.length}</h4>
               </div>
             )}
 
@@ -393,7 +391,6 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
                     <ul>{errors.map((err, idx) => <li key={idx}>{err}</li>)}</ul>
                   </div>
                 )}
-                <h4 className="text-slate-300">Parsed Rows: {fileData.length}</h4>
               </div>
             )}
 

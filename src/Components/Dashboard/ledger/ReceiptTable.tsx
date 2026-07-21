@@ -1,8 +1,7 @@
 import { GroupedReceipt } from "../../../types";
 import { printReceipt } from "../../utils/receiptHandler";
 
-// components/ledger/ReceiptTable.tsx
-export const ReceiptTable = ({ groups, onPrint }: { groups: GroupedReceipt[], onPrint: (r: any) => void }) => (
+export const ReceiptTable = ({ groups }: { groups: GroupedReceipt[] }) => (
     <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
         <table className="w-full text-left">
             <thead>

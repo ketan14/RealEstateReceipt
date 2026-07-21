@@ -1,4 +1,3 @@
-import React from 'react';
 import { Unit } from '../../types';
 
 interface UnitDetailsPanelProps {
