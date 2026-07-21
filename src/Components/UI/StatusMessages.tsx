@@ -1,5 +1,3 @@
-import React from 'react';
-
 // Error Component
 export const ErrorBanner = ({ message }: { message: string }) => (
     <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 flex items-start gap-3 animate-fade-in">
