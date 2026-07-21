@@ -2,15 +2,15 @@ import { ReceiptHistoryItem } from "../../types";
 
 // Build a standalone receipt HTML document for printing/PDF
 export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
-    const printDate = new Date().toLocaleDateString("en-IN", {
-        day: "2-digit", month: "long", year: "numeric",
-    });
-    const balance = r.agreed_sale_value - r.amount;
-    const txRef = r.transaction_ref === "CASH-PAY" ? "Cash Payment" : r.transaction_ref;
-    const aadhaarMasked = `XXXX XXXX ${r.customer_aadhaar.slice(-4)}`;
+  const printDate = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
+  const balance = r.agreed_sale_value - r.amount;
+  const txRef = r.transaction_ref === "CASH-PAY" ? "Cash Payment" : r.transaction_ref;
+  const aadhaarMasked = `XXXX XXXX ${r.customer_aadhaar.slice(-4)}`;
 
-    const coApplicantsHtml = r.co_applicants && r.co_applicants.length > 0
-        ? r.co_applicants.filter(co => co.role === 'Co-Applicant').map((co, idx) => `
+  const coApplicantsHtml = r.co_applicants && r.co_applicants.length > 0
+    ? r.co_applicants.filter(co => co.role === 'Co-Applicant').map((co, idx) => `
         <div style="margin-top: 14px; border-top: 1px dashed #e5e7eb; padding-top: 10px;">
           <div class="field-label">Co-Applicant ${idx + 1}</div>
           <div class="field-value">${co.name}</div>
@@ -18,16 +18,16 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
           <div class="field-value">${co.pan_number} / XXXX XXXX ${co.aadhaar_number.slice(-4)}</div>
         </div>
       `).join('')
-        : '';
+    : '';
 
-    const reraHtml = r.rera_number
-        ? `
+  const reraHtml = r.rera_number
+    ? `
       <div class="field-label">RERA Registration</div>
       <div class="field-value">${r.rera_number}</div>
       `
-        : '';
+    : '';
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -170,7 +170,7 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
   <!-- Header -->
   <div class="header">
     <div>
-      <div class="company-name">Aether RealEstate</div>
+      <div class="company-name">Sukirti Developers</div>
       <div class="company-sub">Offline-First Real Estate ERP &bull; Secure &amp; Certified</div>
     </div>
     <div>
