@@ -1193,3 +1193,171 @@ pub async fn void_receipt(
 
     Ok(())
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CustomerPropertySummary {
+    pub booking_id: i64,
+    pub unit_number: String,
+    pub project_name: String,
+    pub tower_name: String,
+    pub agreed_sale_value: f64,
+    pub total_paid: f64,
+    pub outstanding_balance: f64,
+    pub role: String, // "Primary" or "Co-Applicant"
+    pub receipts: Vec<ReceiptItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CustomerProfile {
+    pub customer: Customer,
+    pub properties: Vec<CustomerPropertySummary>,
+    pub grand_total_agreed: f64,
+    pub grand_total_paid: f64,
+    pub grand_total_outstanding: f64,
+}
+
+#[tauri::command]
+pub async fn search_customers(
+    query: String,
+    state: State<'_, DbState>,
+) -> Result<Vec<Customer>, String> {
+    let pool = &state.pool;
+    let like_query = format!("%{}%", query);
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id, name, phone, pan_number, aadhaar_number
+        FROM customers
+        WHERE name LIKE ? OR phone LIKE ? OR pan_number LIKE ? OR aadhaar_number LIKE ?
+        ORDER BY name ASC
+        LIMIT 50
+        "#
+    )
+    .bind(&like_query)
+    .bind(&like_query)
+    .bind(&like_query)
+    .bind(&like_query)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to search customers: {}", e))?;
+
+    let mut customers = Vec::new();
+    for row in rows {
+        customers.push(Customer {
+            id: Some(row.get("id")),
+            name: row.get("name"),
+            phone: row.get("phone"),
+            pan_number: row.get("pan_number"),
+            aadhaar_number: row.get("aadhaar_number"),
+        });
+    }
+
+    Ok(customers)
+}
+
+#[tauri::command]
+pub async fn get_customer_profile(
+    customer_id: i64,
+    state: State<'_, DbState>,
+) -> Result<CustomerProfile, String> {
+    let pool = &state.pool;
+
+    // Fetch customer details
+    let c_row = sqlx::query(
+        "SELECT id, name, phone, pan_number, aadhaar_number FROM customers WHERE id = ?"
+    )
+    .bind(customer_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Customer not found: {}", e))?;
+
+    let customer = Customer {
+        id: Some(c_row.get("id")),
+        name: c_row.get("name"),
+        phone: c_row.get("phone"),
+        pan_number: c_row.get("pan_number"),
+        aadhaar_number: c_row.get("aadhaar_number"),
+    };
+
+    // Fetch all bookings for this customer (as Primary or Co-Applicant)
+    let b_rows = sqlx::query(
+        r#"
+        SELECT 
+            b.id as booking_id,
+            b.agreed_sale_value,
+            bc.role,
+            u.unit_number,
+            p.name as project_name,
+            t.name as tower_name,
+            COALESCE((SELECT SUM(amount) FROM receipts WHERE booking_id = b.id AND status = 'Active'), 0) as total_paid
+        FROM booking_customers bc
+        JOIN bookings b ON bc.booking_id = b.id
+        JOIN units u ON b.unit_id = u.id
+        JOIN projects p ON u.project_id = p.id
+        JOIN towers t ON u.tower_id = t.id
+        WHERE bc.customer_id = ?
+        ORDER BY b.booking_date DESC
+        "#
+    )
+    .bind(customer_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch customer properties: {}", e))?;
+
+    let mut properties = Vec::new();
+    let mut grand_total_agreed = 0.0;
+    let mut grand_total_paid = 0.0;
+
+    for row in b_rows {
+        let agreed_sale_value: f64 = row.get("agreed_sale_value");
+        let total_paid: f64 = row.get("total_paid");
+        let outstanding_balance = agreed_sale_value - total_paid;
+
+        grand_total_agreed += agreed_sale_value;
+        grand_total_paid += total_paid;
+
+        let booking_id: i64 = row.get("booking_id");
+        
+        let receipt_rows = sqlx::query(
+            "SELECT id, receipt_number, amount, payment_mode, transaction_ref, date, status, void_reason FROM receipts WHERE booking_id = ? ORDER BY id ASC"
+        )
+        .bind(booking_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let mut receipts = Vec::new();
+        for r_row in receipt_rows {
+            receipts.push(ReceiptItem {
+                id: r_row.get("id"),
+                receipt_number: r_row.get("receipt_number"),
+                amount: r_row.get("amount"),
+                payment_mode: r_row.get("payment_mode"),
+                transaction_ref: r_row.get("transaction_ref"),
+                date: r_row.get("date"),
+                status: r_row.get("status"),
+                void_reason: r_row.get("void_reason"),
+            });
+        }
+
+        properties.push(CustomerPropertySummary {
+            booking_id,
+            unit_number: row.get("unit_number"),
+            project_name: row.get("project_name"),
+            tower_name: row.get("tower_name"),
+            agreed_sale_value,
+            total_paid,
+            outstanding_balance,
+            role: row.get("role"),
+            receipts,
+        });
+    }
+
+    Ok(CustomerProfile {
+        customer,
+        properties,
+        grand_total_agreed,
+        grand_total_paid,
+        grand_total_outstanding: grand_total_agreed - grand_total_paid,
+    })
+}

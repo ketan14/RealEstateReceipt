@@ -1,7 +1,7 @@
 // src/components/layout/Header.tsx
 interface HeaderProps {
     activeTab: string;
-    onTabChange: (tab: "explorer" | "history" | "admin") => void;
+    onTabChange: (tab: "explorer" | "history" | "admin" | "customers") => void;
 }
 
 export const Header = ({ activeTab, onTabChange }: HeaderProps) => {
@@ -11,7 +11,7 @@ export const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
             {/* Tab Controls */}
             <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                {(["explorer", "history", "admin"] as const).map((tab) => (
+                {(["explorer", "history", "admin", "customers"] as const).map((tab) => (
                     <button
                         key={tab}
                         onClick={() => onTabChange(tab)}

@@ -120,3 +120,23 @@ export interface GroupedReceipt {
   total_amount_paid: number;
   all_receipts: ReceiptHistoryItem[]; // Keeps track of individual receipts inside the group
 }
+
+export interface CustomerPropertySummary {
+  booking_id: number;
+  unit_number: string;
+  project_name: string;
+  tower_name: string;
+  agreed_sale_value: number;
+  total_paid: number;
+  outstanding_balance: number;
+  role: string;
+  receipts: ReceiptItem[];
+}
+
+export interface CustomerProfile {
+  customer: Customer;
+  properties: CustomerPropertySummary[];
+  grand_total_agreed: number;
+  grand_total_paid: number;
+  grand_total_outstanding: number;
+}

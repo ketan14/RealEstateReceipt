@@ -12,6 +12,7 @@ import { ReceiptLedgerView } from "./Components/Dashboard/ledger/ReceiptLedgerVi
 import { BookingModal } from "./Components/Models/BookingModal";
 import { BookingDetailsModal } from "./Components/Models/BookingDetailsModal";
 import { LockScreen } from "./Components/Auth/LockScreen";
+import { CustomerDirectory } from "./Components/Dashboard/Customers/CustomerDirectory";
 
 function App() {
   // Authentication State
@@ -51,7 +52,7 @@ function App() {
 
   // Navigation & View State
 
-  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin">("explorer");
+  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin" | "customers">("explorer");
   //const [projects, setProjects] = useState<Project[]>([]);
   //const [receipts, setReceipts] = useState<ReceiptHistoryItem[]>([]);
   const [uniqueCombinations, setUniqueCombinations] = useState<ReceiptHistoryItem[]>([]);
@@ -194,6 +195,12 @@ function App() {
         {
           activeTab === "admin" && !loading && (
             <AdminDashboard projectsRef={projects} />
+          )
+        }
+        {/* Tab 4: Customers */}
+        {
+          activeTab === "customers" && !loading && (
+            <CustomerDirectory />
           )
         }
       </main >

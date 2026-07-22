@@ -46,6 +46,10 @@ pub fn run() {
             commands::update_unit,
             commands::delete_unit,
 
+            // customer commands
+            commands::search_customers,
+            commands::get_customer_profile,
+
             // auth commands
             commands::is_pin_setup,
             commands::setup_pin,
