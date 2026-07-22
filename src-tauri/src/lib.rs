@@ -23,6 +23,7 @@ pub fn run() {
             commands::create_booking_and_receipt,
             commands::get_receipt_history,
             commands::open_receipt_html,
+            commands::generate_and_open_pdf,
             commands::get_booking_details_by_unit,
             commands::create_additional_receipt,
             commands::update_unit_status,

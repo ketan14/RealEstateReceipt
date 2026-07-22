@@ -524,6 +524,56 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
 // Instead: frontend sends the receipt HTML, Rust saves it to a temp file,
 // then opens it in the user's default browser where normal print works.
 #[tauri::command]
+pub async fn generate_and_open_pdf(
+    app: tauri::AppHandle,
+    html: String,
+    filename: String,
+) -> Result<(), String> {
+    use std::fs;
+    use headless_chrome::Browser;
+
+    let data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
+
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Cannot create data dir: {e}"))?;
+
+    let safe_name = filename
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect::<String>();
+        
+    let html_path = data_dir.join(format!("{safe_name}.html"));
+    let pdf_path = data_dir.join(format!("{safe_name}.pdf"));
+
+    fs::write(&html_path, html.as_bytes())
+        .map_err(|e| format!("Failed to write HTML file: {e}"))?;
+
+    let html_path_clone = html_path.clone();
+    
+    let pdf_data = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let browser = Browser::default().map_err(|e| format!("Failed to launch browser: {e}"))?;
+        let tab = browser.new_tab().map_err(|e| format!("Failed to open tab: {e}"))?;
+        
+        let file_url = format!("file://{}", html_path_clone.to_str().unwrap_or(""));
+        tab.navigate_to(&file_url).map_err(|e| format!("Failed to navigate: {e}"))?;
+        tab.wait_until_navigated().map_err(|e| format!("Failed to wait for navigation: {e}"))?;
+        
+        let pdf_data = tab.print_to_pdf(None).map_err(|e| format!("Failed to generate PDF: {e}"))?;
+        Ok(pdf_data)
+    }).await.map_err(|e| format!("Task failed: {e}"))??;
+
+    fs::write(&pdf_path, pdf_data)
+        .map_err(|e| format!("Failed to write PDF file: {e}"))?;
+
+    tauri_plugin_opener::open_path(pdf_path.to_str().unwrap_or(""), None::<&str>)
+        .map_err(|e| format!("Failed to open PDF: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_receipt_html(
     app: tauri::AppHandle,
     html: String,

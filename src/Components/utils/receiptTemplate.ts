@@ -47,6 +47,10 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
       body { padding: 0; }
       @page { margin: 0.5in; size: A4 portrait; }
       .no-print { display: none !important; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
     .print-btn {
       display: flex;
