@@ -10,7 +10,13 @@ jobs:
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
       PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:${{ github.workspace }}/android-sdk/platform-tools:${PATH}
     steps:
+      # Ensure tar is available (fixes "Unable to locate executable file: tar")
+      - name: Install tar
+        run: sudo apt-get update && sudo apt-get install -y tar unzip curl
+
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # avoids archive extraction, uses git clone
 
       - uses: actions/setup-node@v4
         with:
