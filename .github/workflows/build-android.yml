@@ -60,6 +60,15 @@ jobs:
 
       - name: Build Tauri Android App
         run: npx tauri android build --target aarch64
+      
+      - name: Sign Release APK
+        uses: rxd-hd/sign-android-release@v1
+        with:
+          releaseDirectory: src-tauri/gen/android/app/build/outputs/apk/universal/release
+          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+          alias: ${{ secrets.ANDROID_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Upload Output Artifacts (APK)
         uses: actions/upload-artifact@v4
