@@ -1,7 +1,7 @@
 name: build-android
 on:
   push:
-    branches: [ feature/tier2 ] # Triggers automatically when you push to main/master
+    branches: [ feature/tier2 ]  # Only runs on this branch
 
 jobs:
   android:
@@ -10,7 +10,11 @@ jobs:
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
       PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:${{ github.workspace }}/android-sdk/platform-tools:${PATH}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'   # Explicitly set Node version
 
       - uses: actions/setup-java@v3
         with:
