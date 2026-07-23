@@ -59,5 +59,8 @@ jobs:
       - name: Init Tauri Android project
         run: npm run tauri android init
 
+      - name: Make gradlew executable
+        run: chmod +x src-tauri/gen/android/gradlew
+
       - name: Build Tauri Android
         run: npm run tauri android build
