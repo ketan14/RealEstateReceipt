@@ -8,19 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
-      PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:${{ github.workspace }}/android-sdk/platform-tools:${PATH}
+      PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:${{ github.workspace }}/android-sdk/platform-tools:${{ env.PATH }}
     steps:
-      # Ensure tar is available (fixes "Unable to locate executable file: tar")
-      - name: Install tar
-        run: sudo apt-get update && sudo apt-get install -y tar unzip curl
-
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # avoids archive extraction, uses git clone
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'   # Explicitly set Node version
+          node-version: '22'
 
       - uses: actions/setup-java@v3
         with:
@@ -31,19 +27,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - run: rustup target add aarch64-linux-android
 
-      - name: Install Android SDK Command-line Tools
+      - name: Install tar/unzip/curl
         run: |
-          sudo mkdir -p $ANDROID_HOME/cmdline-tools
-          curl -o sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip sdk.zip -d $ANDROID_HOME/cmdline-tools
-          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          apt-get update
+          apt-get install -y tar unzip curl
 
-      - name: Install Android SDK components
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-33" \
-            "ndk;25.2.9519653"
-
-      - name: Build Tauri Android
-        run: npm run tauri android build
