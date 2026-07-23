@@ -1,14 +1,13 @@
 name: build-android
 on:
   push:
-    branches: [ feature/tier2 ]  # Only runs on this branch
+    branches: [ feature/tier2 ]
 
 jobs:
   android:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
-      PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:${{ github.workspace }}/android-sdk/platform-tools:${{ env.PATH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,3 +31,22 @@ jobs:
           apt-get update
           apt-get install -y tar unzip curl
 
+      - name: Add Android SDK to PATH
+        run: echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      - name: Install Android SDK Command-line Tools
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          curl -o sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip sdk.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Install Android SDK components
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-33" \
+            "ndk;25.2.9519653"
+
+      - name: Build Tauri Android
+        run: npm run tauri android build
