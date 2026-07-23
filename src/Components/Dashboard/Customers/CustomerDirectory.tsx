@@ -81,8 +81,8 @@ export const CustomerDirectory = () => {
                             key={c.id}
                             onClick={() => c.id && loadProfile(c.id)}
                             className={`w-full text-left p-3 rounded-lg mb-1 transition-colors ${selectedCustomerId === c.id
-                                    ? "bg-indigo-600/20 border border-indigo-500/50"
-                                    : "hover:bg-slate-800 border border-transparent"
+                                ? "bg-indigo-600/20 border border-indigo-500/50"
+                                : "hover:bg-slate-800 border border-transparent"
                                 }`}
                         >
                             <div className="font-semibold text-slate-200">{c.name}</div>
