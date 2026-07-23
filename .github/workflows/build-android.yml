@@ -50,5 +50,8 @@ jobs:
             "platforms;android-33" \
             "ndk;25.2.9519653"
 
+      - name: Install Tauri CLI
+        run: npm install --global @tauri-apps/cli
+
       - name: Build Tauri Android
         run: npm run tauri android build
