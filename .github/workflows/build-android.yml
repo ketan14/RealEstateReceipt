@@ -53,5 +53,8 @@ jobs:
       - name: Install Tauri CLI
         run: npm install --global @tauri-apps/cli
 
+      - name: Init Tauri Android project
+        run: npm run tauri android init
+
       - name: Build Tauri Android
         run: npm run tauri android build
