@@ -78,8 +78,13 @@ function App() {
   const errorMsgState = useAppStore((state) => state.errorMsg);
   // Load Data 
   useEffect(() => {
+    console.log('load data Called once in App.tsx')
     loadData();
   }, [loadData]);
+  useEffect(() => {
+    console.log('projects Called once in App.tsx')
+  }, [projects]);
+
   useEffect(() => {
     setErrorMsg(errorMsgState);
   }, [errorMsgState]);
@@ -93,12 +98,6 @@ function App() {
     );
     setUniqueCombinations(uniqueCombinations);
   }, [receipts]);
-
-  useEffect(() => {
-    console.log("Unique combinations:", uniqueCombinations);
-  }, [uniqueCombinations]);
-  useEffect(() => {
-  }, [projects])
 
   // Handle unit selection
   const selectUnitForBooking = async (unit: Unit) => {
@@ -117,7 +116,6 @@ function App() {
       try {
         //setLoading(true);
         const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: unit.id });
-        debugger;
         console.timeLog('details', details)
         setBookingDetails(details);
         setIsDetailsOpen(true);
@@ -194,7 +192,7 @@ function App() {
         {/* Tab 3: Admin */}
         {
           activeTab === "admin" && !loading && (
-            <AdminDashboard projectsRef={projects} />
+            <AdminDashboard projectsRef={projects} loadData={loadData} />
           )
         }
         {/* Tab 4: Customers */}

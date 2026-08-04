@@ -6,9 +6,10 @@ import Papa from "papaparse";
 interface AdminUnitsProps {
   projectId: number; // already provided from parent
   towersRef: Tower[];
+  loadData: () => Promise<void>;
 }
 
-export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
+export default function AdminUnits({ projectId, towersRef, loadData }: AdminUnitsProps) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [towers, setTowers] = useState<Tower[]>([]);
   const [towerId, setTowerId] = useState<number | null>(null);
@@ -16,7 +17,7 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
   const [status, setStatus] = useState("Available");
   const [basePrice, setBasePrice] = useState<number>(0);
   const [configuration, setConfiguration] = useState("");
-
+  ``
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]); const [mode, setMode] = useState<"single" | "bulk" | "bulkCustom">("single");
@@ -33,13 +34,13 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
   }, [projectId]);
 
   async function loadUnits() {
+    console.log('loadUnits')
     const data = await getUnits(projectId);
     setUnits(data);
   }
 
   async function loadTowers() {
     const dataTower = await getTowers(projectId); // backend should filter towers by projectId
-    console.log(dataTower)
     setTowers(dataTower);
   }
 
@@ -49,6 +50,7 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
       await createUnit(projectId, towerId, unitNumber, status, basePrice, configuration);
       resetForm();
       setShowAddModal(false);
+      await loadData();
       loadUnits();
     }
   }
@@ -67,7 +69,8 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
       resetForm();
       setSelectedUnit(null);
       setShowUpdateModal(false);
-      loadUnits();
+      await loadUnits();
+      await loadData();
     }
   }
 
@@ -488,7 +491,7 @@ export default function AdminUnits({ projectId, towersRef }: AdminUnitsProps) {
                 onClick={handleUpdateSave}
                 className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all text-sm"
               >
-                Update
+                Update1
               </button>
             </div>
           </div>

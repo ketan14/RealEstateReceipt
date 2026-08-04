@@ -4,7 +4,7 @@ import { createProject, deleteProject, getProjects, updateProject } from "../api
 import ProjectDetail from "./ProjectDetail";
 import { invoke } from "@tauri-apps/api/core";
 
-export default function AdminDashboard({ projectsRef }: { projectsRef: Project[] }) {
+export default function AdminDashboard({ projectsRef, loadData }: { projectsRef: Project[], loadData: () => Promise<void> }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -189,6 +189,7 @@ export default function AdminDashboard({ projectsRef }: { projectsRef: Project[]
           projectId={selectedProjectId}
           projectsRef={projectsRef}
           onBack={() => setSelectedProjectId(null)} // back to list
+          loadData={loadData}
         />
       )}
     </div>
