@@ -8,7 +8,8 @@ export async function createUnit(
   unitNumber: string,
   status: string,
   basePrice: number,
-  configuration: string
+  configuration: string,
+  carpetAreaSqm?: number
 ) {
   return await invoke<number>("create_unit", {
     projectId,
@@ -17,6 +18,7 @@ export async function createUnit(
     status,
     basePrice,
     configuration,
+    carpetAreaSqm,
   });
 }
 
@@ -33,7 +35,8 @@ export async function updateUnit(
   unitNumber: string,
   status: string,
   basePrice: number,
-  configuration: string
+  configuration: string,
+  carpetAreaSqm?: number
 ) {
   return await invoke<void>("update_unit", {
     id,
@@ -43,6 +46,7 @@ export async function updateUnit(
     status,
     basePrice,
     configuration,
+    carpetAreaSqm,
   });
 }
 

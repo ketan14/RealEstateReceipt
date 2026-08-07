@@ -13,6 +13,7 @@ import { BookingModal } from "./Components/Models/BookingModal";
 import { BookingDetailsModal } from "./Components/Models/BookingDetailsModal";
 import { LockScreen } from "./Components/Auth/LockScreen";
 import { CustomerDirectory } from "./Components/Dashboard/Customers/CustomerDirectory";
+import { ReportsTab } from "./Components/Dashboard/ReportsTab";
 
 function App() {
   // Authentication State
@@ -52,7 +53,7 @@ function App() {
 
   // Navigation & View State
 
-  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin" | "customers">("explorer");
+  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin" | "customers" | "reports">("explorer");
   //const [projects, setProjects] = useState<Project[]>([]);
   //const [receipts, setReceipts] = useState<ReceiptHistoryItem[]>([]);
   const [uniqueCombinations, setUniqueCombinations] = useState<ReceiptHistoryItem[]>([]);
@@ -201,6 +202,9 @@ function App() {
             <CustomerDirectory />
           )
         }
+        {activeTab === "reports" && !loading && (
+          <ReportsTab />
+        )}
       </main >
       {/* Booking Form Modal Overlay */}
 

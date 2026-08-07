@@ -57,6 +57,15 @@ pub fn run() {
             
             // backup commands
             commands::create_backup,
+
+            // tier 3 payment schedule commands
+            commands::create_payment_schedule,
+            commands::get_payment_schedule,
+            commands::update_milestone_status,
+
+            // tier 3 reporting & analytics commands
+            commands::get_financial_dashboard_stats,
+            commands::get_overdue_milestones_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,6 +6,7 @@ export interface Unit {
   status: 'Available' | 'Booked' | 'Registered';
   base_price: number;
   configuration: string;
+  carpet_area_sqm?: number;
 }
 
 export interface UnitCSVRow {
@@ -14,6 +15,7 @@ export interface UnitCSVRow {
   status: string;
   base_price: string;
   configuration: string;
+  carpet_area_sqm?: string;
 }
 
 export interface Tower {
@@ -30,6 +32,8 @@ export interface Project {
   location: string;
   rera_number?: string | null;
   rera_website_url?: string | null;
+  is_metro?: boolean;
+  occupancy_certificate_date?: string | null;
   towers: Tower[];
 }
 
@@ -61,6 +65,11 @@ export interface ReceiptHistoryItem {
   date: string;
   status: string;
   void_reason?: string | null;
+  gst_rate?: number | null;
+  gst_amount?: number | null;
+  taxable_value?: number | null;
+  tds_amount?: number | null;
+  gst_basis?: string | null;
   booking_id: number;
   agreed_sale_value: number;
   booking_date: string;
@@ -84,6 +93,11 @@ export interface ReceiptItem {
   date: string;
   status: string;
   void_reason?: string | null;
+  gst_rate?: number | null;
+  gst_amount?: number | null;
+  taxable_value?: number | null;
+  tds_amount?: number | null;
+  gst_basis?: string | null;
 }
 
 export interface BookingCustomerInfo {
@@ -108,9 +122,8 @@ export interface BookingDetails {
   co_applicants: BookingCustomerInfo[];
 }
 
-// 1. Define an interface for our grouped records
 export interface GroupedReceipt {
-  id: string; // unique composite key
+  id: string;
   customer_name: string;
   customer_phone: string;
   unit_number: string;
@@ -118,7 +131,7 @@ export interface GroupedReceipt {
   tower_name: string;
   agreed_sale_value: number;
   total_amount_paid: number;
-  all_receipts: ReceiptHistoryItem[]; // Keeps track of individual receipts inside the group
+  all_receipts: ReceiptHistoryItem[];
 }
 
 export interface CustomerPropertySummary {
@@ -139,4 +152,58 @@ export interface CustomerProfile {
   grand_total_agreed: number;
   grand_total_paid: number;
   grand_total_outstanding: number;
+}
+
+export interface PaymentScheduleItem {
+  id: number;
+  booking_id: number;
+  milestone_name: string;
+  due_date?: string | null;
+  percentage: number;
+  due_amount: number;
+  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PaymentMilestoneInput {
+  milestone_name: string;
+  due_date?: string | null;
+  percentage: number;
+  due_amount: number;
+}
+
+export interface ProjectRevenueSummary {
+  project_id: number;
+  project_name: string;
+  total_units: number;
+  booked_units: number;
+  total_agreed_value: number;
+  total_collected: number;
+  total_outstanding: number;
+}
+
+export interface FinancialDashboardStats {
+  total_revenue: number;
+  total_collected: number;
+  total_outstanding: number;
+  overdue_amount: number;
+  total_units: number;
+  booked_units: number;
+  available_units: number;
+  registered_units: number;
+  project_summaries: ProjectRevenueSummary[];
+}
+
+export interface OverdueMilestoneReport {
+  milestone_id: number;
+  booking_id: number;
+  milestone_name: string;
+  due_date: string;
+  due_amount: number;
+  status: string;
+  customer_name: string;
+  customer_phone: string;
+  unit_number: string;
+  project_name: string;
 }
