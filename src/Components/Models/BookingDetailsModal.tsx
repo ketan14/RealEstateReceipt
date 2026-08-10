@@ -462,7 +462,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                 <div className="px-6 py-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center shrink-0">
 
                     {/* Alert error panel inside modal */}
-                    <div className="max-w-[50%] overflow-hidden truncate">
+                    <div className="max-w-[70%] overflow-hidden truncate">
                         {errorMsgFromModal && (
                             <span className="text-red-400 font-medium text-xs flex items-center gap-1.5">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500 shrink-0">

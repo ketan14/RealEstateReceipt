@@ -275,6 +275,34 @@ async fn apply_migrations(pool: &SqlitePool) -> Result<(), String> {
             "ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active', 'Voided'))",
             "ALTER TABLE receipts ADD COLUMN void_reason TEXT",
         ]),
+        // Tier 3 — GST/TDS fields and payment schedules
+        ("008_add_gst_and_schedule_tables", vec![
+            "ALTER TABLE projects ADD COLUMN is_metro INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE projects ADD COLUMN occupancy_certificate_date TEXT",
+
+            "ALTER TABLE units ADD COLUMN carpet_area_sqm REAL NOT NULL DEFAULT 0.0",
+
+            "ALTER TABLE receipts ADD COLUMN gst_rate REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE receipts ADD COLUMN gst_amount REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE receipts ADD COLUMN taxable_value REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE receipts ADD COLUMN tds_amount REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE receipts ADD COLUMN gst_basis TEXT",
+
+            r#"
+            CREATE TABLE IF NOT EXISTS payment_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                booking_id INTEGER NOT NULL,
+                milestone_name TEXT NOT NULL,
+                due_date TEXT,
+                percentage REAL NOT NULL,
+                due_amount REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Partially Paid', 'Paid', 'Overdue')),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+            );
+            "#,
+        ]),
     ];
 
     for (name, queries) in migrations {

@@ -3,9 +3,10 @@ import { getTowers, createTower, updateTower, deleteTower } from "../api/towers"
 
 interface AdminTowersProps {
   projectId: number;
+  loadData: () => Promise<void>;
 }
 
-export default function AdminTowers({ projectId }: AdminTowersProps) {
+export default function AdminTowers({ projectId, loadData }: AdminTowersProps) {
   const [towers, setTowers] = useState<{ id: number; project_id: number; name: string }[]>([]);
   const [towerName, setTowerName] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -27,6 +28,7 @@ export default function AdminTowers({ projectId }: AdminTowersProps) {
       setTowerName("");
       setShowAddModal(false);
       loadTowers();
+      await loadData();
     }
   }
 
@@ -37,6 +39,7 @@ export default function AdminTowers({ projectId }: AdminTowersProps) {
       setTowerName("");
       setShowUpdateModal(false);
       loadTowers();
+      await loadData();
     }
   }
 

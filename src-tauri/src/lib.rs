@@ -23,6 +23,7 @@ pub fn run() {
             commands::create_booking_and_receipt,
             commands::get_receipt_history,
             commands::open_receipt_html,
+            commands::generate_and_open_pdf,
             commands::get_booking_details_by_unit,
             commands::create_additional_receipt,
             commands::update_unit_status,
@@ -45,6 +46,10 @@ pub fn run() {
             commands::update_unit,
             commands::delete_unit,
 
+            // customer commands
+            commands::search_customers,
+            commands::get_customer_profile,
+
             // auth commands
             commands::is_pin_setup,
             commands::setup_pin,
@@ -52,6 +57,15 @@ pub fn run() {
             
             // backup commands
             commands::create_backup,
+
+            // tier 3 payment schedule commands
+            commands::create_payment_schedule,
+            commands::get_payment_schedule,
+            commands::update_milestone_status,
+
+            // tier 3 reporting & analytics commands
+            commands::get_financial_dashboard_stats,
+            commands::get_overdue_milestones_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

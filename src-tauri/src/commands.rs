@@ -20,6 +20,7 @@ pub struct Unit {
     pub status: String, // "Available", "Booked", "Registered"
     pub base_price: f64,
     pub configuration: String,
+    pub carpet_area_sqm: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,6 +38,8 @@ pub struct Project {
     pub location: String,
     pub rera_number: Option<String>,
     pub rera_website_url: Option<String>,
+    pub is_metro: Option<bool>,
+    pub occupancy_certificate_date: Option<String>,
     pub towers: Option<Vec<Tower>>, // optional towers
 }
 
@@ -81,6 +84,11 @@ pub struct ReceiptHistoryItem {
     pub date: String,
     pub status: String,
     pub void_reason: Option<String>,
+    pub gst_rate: Option<f64>,
+    pub gst_amount: Option<f64>,
+    pub taxable_value: Option<f64>,
+    pub tds_amount: Option<f64>,
+    pub gst_basis: Option<String>,
     pub booking_id: i64,
     pub agreed_sale_value: f64,
     pub booking_date: String,
@@ -165,7 +173,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
     let pool = &state.pool;
 
     // 1. Fetch all projects
-    let projects_rows = sqlx::query("SELECT id, name, location, rera_number, rera_website_url FROM projects ORDER BY name")
+    let projects_rows = sqlx::query("SELECT id, name, location, rera_number, rera_website_url, is_metro, occupancy_certificate_date FROM projects ORDER BY name")
         .fetch_all(pool)
         .await
         .map_err(|e| format!("Failed to fetch projects: {}", e))?;
@@ -177,6 +185,8 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
         let p_location: String = p_row.get("location");
         let p_rera: Option<String> = p_row.get("rera_number");
         let p_rera_url: Option<String> = p_row.get("rera_website_url");
+        let is_m: i64 = p_row.get("is_metro");
+        let oc_date: Option<String> = p_row.get("occupancy_certificate_date");
 
         // 2. Fetch towers for this project
         let towers_rows = sqlx::query("SELECT id, name FROM towers WHERE project_id = ? ORDER BY name")
@@ -192,7 +202,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
 
             // 3. Fetch units for this tower
             let units_rows = sqlx::query(
-                "SELECT id, unit_number, status, base_price, configuration FROM units WHERE tower_id = ? ORDER BY unit_number"
+                "SELECT id, unit_number, status, base_price, configuration, carpet_area_sqm FROM units WHERE tower_id = ? ORDER BY unit_number"
             )
             .bind(t_id)
             .fetch_all(pool)
@@ -209,6 +219,7 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
                     status: u_row.get("status"),
                     base_price: u_row.get("base_price"),
                     configuration: u_row.get("configuration"),
+                    carpet_area_sqm: u_row.get("carpet_area_sqm"),
                 });
             }
 
@@ -226,6 +237,8 @@ pub async fn get_property_map(state: State<'_, DbState>) -> Result<Vec<Project>,
             location: p_location,
             rera_number: p_rera,
             rera_website_url: p_rera_url,
+            is_metro: Some(is_m != 0),
+            occupancy_certificate_date: oc_date,
             towers: Some(towers),
         });
     }
@@ -383,26 +396,52 @@ pub async fn create_booking_and_receipt(
         .await
         .map_err(|e| format!("Failed to update unit status: {}", e))?;
 
-    // 5. Get project_id for this unit (needed for receipt numbering)
-    let unit_project_id: i64 = sqlx::query_scalar("SELECT project_id FROM units WHERE id = ?")
-        .bind(payload.unit_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| format!("Failed to get unit project: {}", e))?;
+    // 5. Get tax parameters & project_id for this unit
+    let unit_info = sqlx::query(
+        "SELECT u.project_id, u.carpet_area_sqm, p.is_metro, p.occupancy_certificate_date FROM units u JOIN projects p ON u.project_id = p.id WHERE u.id = ?"
+    )
+    .bind(payload.unit_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| format!("Failed to get unit tax info: {}", e))?;
+
+    let unit_project_id: i64 = unit_info.get("project_id");
+    let carpet_area_sqm: f64 = unit_info.get("carpet_area_sqm");
+    let is_m: i64 = unit_info.get("is_metro");
+    let oc_date: Option<String> = unit_info.get("occupancy_certificate_date");
+
+    let gst = calculate_gst_and_tds(
+        payload.agreed_sale_value,
+        payload.receipt_amount,
+        carpet_area_sqm,
+        is_m != 0,
+        oc_date.as_deref(),
+        &payload.booking_date,
+    );
 
     // 6. Generate Receipt Number (configurable, per-project, per-FY)
     let receipt_number = generate_receipt_number(&mut tx, unit_project_id, &payload.booking_date).await?;
 
-    // 7. Create Receipt
+    // 7. Create Receipt with Tax Breakdown
     sqlx::query(
-        "INSERT INTO receipts (booking_id, receipt_number, amount, payment_mode, transaction_ref, date) VALUES (?, ?, ?, ?, ?, ?)"
+        r#"
+        INSERT INTO receipts (
+            booking_id, receipt_number, amount, payment_mode, transaction_ref, date,
+            gst_rate, gst_amount, taxable_value, tds_amount, gst_basis
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#
     )
     .bind(booking_id)
     .bind(&receipt_number)
     .bind(payload.receipt_amount)
     .bind(&payload.payment_mode)
     .bind(&payload.transaction_ref)
-    .bind(&payload.booking_date) // using the same date for booking & initial receipt
+    .bind(&payload.booking_date)
+    .bind(gst.gst_rate)
+    .bind(gst.gst_amount)
+    .bind(gst.taxable_value)
+    .bind(gst.tds_amount)
+    .bind(&gst.gst_basis)
     .execute(&mut *tx)
     .await
     .map_err(|e| format!("Failed to create receipt: {}", e))?;
@@ -430,6 +469,11 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             r.date,
             r.status,
             r.void_reason,
+            r.gst_rate,
+            r.gst_amount,
+            r.taxable_value,
+            r.tds_amount,
+            r.gst_basis,
             b.id as booking_id,
             b.agreed_sale_value,
             b.booking_date,
@@ -501,6 +545,11 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
             date: row.get("date"),
             status: row.get("status"),
             void_reason: row.get("void_reason"),
+            gst_rate: row.get("gst_rate"),
+            gst_amount: row.get("gst_amount"),
+            taxable_value: row.get("taxable_value"),
+            tds_amount: row.get("tds_amount"),
+            gst_basis: row.get("gst_basis"),
             booking_id,
             agreed_sale_value: row.get("agreed_sale_value"),
             booking_date: row.get("booking_date"),
@@ -523,6 +572,56 @@ pub async fn get_receipt_history(state: State<'_, DbState>) -> Result<Vec<Receip
 // window.print() does NOT work inside Tauri's WKWebView on macOS.
 // Instead: frontend sends the receipt HTML, Rust saves it to a temp file,
 // then opens it in the user's default browser where normal print works.
+#[tauri::command]
+pub async fn generate_and_open_pdf(
+    app: tauri::AppHandle,
+    html: String,
+    filename: String,
+) -> Result<(), String> {
+    use std::fs;
+    use headless_chrome::Browser;
+
+    let data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
+
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Cannot create data dir: {e}"))?;
+
+    let safe_name = filename
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect::<String>();
+        
+    let html_path = data_dir.join(format!("{safe_name}.html"));
+    let pdf_path = data_dir.join(format!("{safe_name}.pdf"));
+
+    fs::write(&html_path, html.as_bytes())
+        .map_err(|e| format!("Failed to write HTML file: {e}"))?;
+
+    let html_path_clone = html_path.clone();
+    
+    let pdf_data = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let browser = Browser::default().map_err(|e| format!("Failed to launch browser: {e}"))?;
+        let tab = browser.new_tab().map_err(|e| format!("Failed to open tab: {e}"))?;
+        
+        let file_url = format!("file://{}", html_path_clone.to_str().unwrap_or(""));
+        tab.navigate_to(&file_url).map_err(|e| format!("Failed to navigate: {e}"))?;
+        tab.wait_until_navigated().map_err(|e| format!("Failed to wait for navigation: {e}"))?;
+        
+        let pdf_data = tab.print_to_pdf(None).map_err(|e| format!("Failed to generate PDF: {e}"))?;
+        Ok(pdf_data)
+    }).await.map_err(|e| format!("Task failed: {e}"))??;
+
+    fs::write(&pdf_path, pdf_data)
+        .map_err(|e| format!("Failed to write PDF file: {e}"))?;
+
+    tauri_plugin_opener::open_path(pdf_path.to_str().unwrap_or(""), None::<&str>)
+        .map_err(|e| format!("Failed to open PDF: {e}"))?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_receipt_html(
     app: tauri::AppHandle,
@@ -568,6 +667,11 @@ pub struct ReceiptItem {
     pub date: String,
     pub status: String,
     pub void_reason: Option<String>,
+    pub gst_rate: Option<f64>,
+    pub gst_amount: Option<f64>,
+    pub taxable_value: Option<f64>,
+    pub tds_amount: Option<f64>,
+    pub gst_basis: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -637,7 +741,12 @@ pub async fn get_booking_details_by_unit(
                     transaction_ref,
                     date,
                     status,
-                    void_reason
+                    void_reason,
+                    gst_rate,
+                    gst_amount,
+                    taxable_value,
+                    tds_amount,
+                    gst_basis
                 FROM receipts
                 WHERE booking_id = ?
                 ORDER BY id ASC
@@ -659,6 +768,11 @@ pub async fn get_booking_details_by_unit(
                     date: r_row.get("date"),
                     status: r_row.get("status"),
                     void_reason: r_row.get("void_reason"),
+                    gst_rate: r_row.get("gst_rate"),
+                    gst_amount: r_row.get("gst_amount"),
+                    taxable_value: r_row.get("taxable_value"),
+                    tds_amount: r_row.get("tds_amount"),
+                    gst_basis: r_row.get("gst_basis"),
                 });
             }
 
@@ -732,9 +846,9 @@ pub async fn create_additional_receipt(
         .await
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
-    // 1. Get agreed sale value and unit's project_id
+    // 1. Get agreed sale value, unit's project_id, and tax parameters
     let booking_row = sqlx::query(
-        "SELECT b.agreed_sale_value, u.project_id FROM bookings b JOIN units u ON b.unit_id = u.id WHERE b.id = ?"
+        "SELECT b.agreed_sale_value, u.project_id, u.carpet_area_sqm, p.is_metro, p.occupancy_certificate_date FROM bookings b JOIN units u ON b.unit_id = u.id JOIN projects p ON u.project_id = p.id WHERE b.id = ?"
     )
     .bind(booking_id)
     .fetch_one(&mut *tx)
@@ -743,6 +857,18 @@ pub async fn create_additional_receipt(
 
     let agreed_sale_value: f64 = booking_row.get("agreed_sale_value");
     let unit_project_id: i64 = booking_row.get("project_id");
+    let carpet_area_sqm: f64 = booking_row.get("carpet_area_sqm");
+    let is_m: i64 = booking_row.get("is_metro");
+    let oc_date: Option<String> = booking_row.get("occupancy_certificate_date");
+
+    let gst = calculate_gst_and_tds(
+        agreed_sale_value,
+        amount,
+        carpet_area_sqm,
+        is_m != 0,
+        oc_date.as_deref(),
+        &date,
+    );
 
     // 2. Get total amount paid so far (exclude voided receipts)
     let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0.0) FROM receipts WHERE booking_id = ? AND status = 'Active'")
@@ -763,9 +889,14 @@ pub async fn create_additional_receipt(
     // 3. Generate Receipt Number (configurable, per-project, per-FY)
     let receipt_number = generate_receipt_number(&mut tx, unit_project_id, &date).await?;
 
-    // 4. Create Receipt
+    // 4. Create Receipt with Tax Breakdown
     sqlx::query(
-        "INSERT INTO receipts (booking_id, receipt_number, amount, payment_mode, transaction_ref, date) VALUES (?, ?, ?, ?, ?, ?)"
+        r#"
+        INSERT INTO receipts (
+            booking_id, receipt_number, amount, payment_mode, transaction_ref, date,
+            gst_rate, gst_amount, taxable_value, tds_amount, gst_basis
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#
     )
     .bind(booking_id)
     .bind(&receipt_number)
@@ -773,6 +904,11 @@ pub async fn create_additional_receipt(
     .bind(&payment_mode)
     .bind(&transaction_ref)
     .bind(&date)
+    .bind(gst.gst_rate)
+    .bind(gst.gst_amount)
+    .bind(gst.taxable_value)
+    .bind(gst.tds_amount)
+    .bind(&gst.gst_basis)
     .execute(&mut *tx)
     .await
     .map_err(|e| format!("Failed to create receipt: {}", e))?;
@@ -834,19 +970,31 @@ pub async fn create_project(
 #[tauri::command]
 pub async fn get_projects(state: State<'_, DbState>) -> Result<Vec<Project>, String> {
     let pool = &state.pool;
-    let rows = sqlx::query("SELECT id, name, location, rera_number, rera_website_url FROM projects ORDER BY name")
-        .fetch_all(pool)
-        .await
-        .map_err(|e| format!("Failed to fetch projects: {}", e))?;
+    
+    // 1. Include the missing columns in your SQL query
+    let rows = sqlx::query(
+        "SELECT id, name, location, rera_number, rera_website_url, is_metro, occupancy_certificate_date 
+         FROM projects 
+         ORDER BY name"
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch projects: {}", e))?;
 
-    Ok(rows.into_iter().map(|row| Project {
-        id: row.get("id"),
-        name: row.get("name"),
-        location: row.get("location"),
-        rera_number: row.get("rera_number"),
-        rera_website_url: row.get("rera_website_url"),
-        towers: None,
-    }).collect())
+    // 2. Map the new fields in the struct initializer
+    Ok(rows
+        .into_iter()
+        .map(|row| Project {
+            id: row.get("id"),
+            name: row.get("name"),
+            location: row.get("location"),
+            rera_number: row.get("rera_number"),
+            rera_website_url: row.get("rera_website_url"),
+            is_metro: row.get("is_metro"),
+            occupancy_certificate_date: row.get("occupancy_certificate_date"),
+            towers: None,
+        })
+        .collect())
 }
 
 // UPDATE
@@ -977,8 +1125,10 @@ pub async fn create_unit(
 pub async fn get_units(state: State<'_, DbState>, project_id: i64) -> Result<Vec<Unit>, String> {
     println!("Message from Rust: {}", project_id);
     let pool = &state.pool;
+    
+    // 1. Add carpet_area_sqm to the SQL SELECT query
     let rows = sqlx::query(
-        "SELECT id, project_id, tower_id, unit_number, status, base_price, configuration
+        "SELECT id, project_id, tower_id, unit_number, status, base_price, configuration, carpet_area_sqm
          FROM units
          WHERE project_id = ?
          ORDER BY unit_number"
@@ -988,6 +1138,7 @@ pub async fn get_units(state: State<'_, DbState>, project_id: i64) -> Result<Vec
     .await
     .map_err(|e| format!("Failed to fetch units: {}", e))?;
 
+    // 2. Map carpet_area_sqm into the Unit struct
     Ok(rows.into_iter().map(|row| Unit {
         id: row.get("id"),
         project_id: row.get("project_id"),
@@ -996,6 +1147,7 @@ pub async fn get_units(state: State<'_, DbState>, project_id: i64) -> Result<Vec
         status: row.get("status"),
         base_price: row.get("base_price"),
         configuration: row.get("configuration"),
+        carpet_area_sqm: row.get("carpet_area_sqm"),
     }).collect())
 }
 
@@ -1142,4 +1294,510 @@ pub async fn void_receipt(
     }
 
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CustomerPropertySummary {
+    pub booking_id: i64,
+    pub unit_number: String,
+    pub project_name: String,
+    pub tower_name: String,
+    pub agreed_sale_value: f64,
+    pub total_paid: f64,
+    pub outstanding_balance: f64,
+    pub role: String, // "Primary" or "Co-Applicant"
+    pub receipts: Vec<ReceiptItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CustomerProfile {
+    pub customer: Customer,
+    pub properties: Vec<CustomerPropertySummary>,
+    pub grand_total_agreed: f64,
+    pub grand_total_paid: f64,
+    pub grand_total_outstanding: f64,
+}
+
+#[tauri::command]
+pub async fn search_customers(
+    query: String,
+    state: State<'_, DbState>,
+) -> Result<Vec<Customer>, String> {
+    let pool = &state.pool;
+    let like_query = format!("%{}%", query);
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id, name, phone, pan_number, aadhaar_number
+        FROM customers
+        WHERE name LIKE ? OR phone LIKE ? OR pan_number LIKE ? OR aadhaar_number LIKE ?
+        ORDER BY name ASC
+        LIMIT 50
+        "#
+    )
+    .bind(&like_query)
+    .bind(&like_query)
+    .bind(&like_query)
+    .bind(&like_query)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to search customers: {}", e))?;
+
+    let mut customers = Vec::new();
+    for row in rows {
+        customers.push(Customer {
+            id: Some(row.get("id")),
+            name: row.get("name"),
+            phone: row.get("phone"),
+            pan_number: row.get("pan_number"),
+            aadhaar_number: row.get("aadhaar_number"),
+        });
+    }
+
+    Ok(customers)
+}
+
+#[tauri::command]
+pub async fn get_customer_profile(
+    customer_id: i64,
+    state: State<'_, DbState>,
+) -> Result<CustomerProfile, String> {
+    let pool = &state.pool;
+
+    // Fetch customer details
+    let c_row = sqlx::query(
+        "SELECT id, name, phone, pan_number, aadhaar_number FROM customers WHERE id = ?"
+    )
+    .bind(customer_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Customer not found: {}", e))?;
+
+    let customer = Customer {
+        id: Some(c_row.get("id")),
+        name: c_row.get("name"),
+        phone: c_row.get("phone"),
+        pan_number: c_row.get("pan_number"),
+        aadhaar_number: c_row.get("aadhaar_number"),
+    };
+
+    // Fetch all bookings for this customer (as Primary or Co-Applicant)
+    let b_rows = sqlx::query(
+        r#"
+        SELECT 
+            b.id as booking_id,
+            b.agreed_sale_value,
+            bc.role,
+            u.unit_number,
+            p.name as project_name,
+            t.name as tower_name,
+            COALESCE((SELECT SUM(amount) FROM receipts WHERE booking_id = b.id AND status = 'Active'), 0) as total_paid
+        FROM booking_customers bc
+        JOIN bookings b ON bc.booking_id = b.id
+        JOIN units u ON b.unit_id = u.id
+        JOIN projects p ON u.project_id = p.id
+        JOIN towers t ON u.tower_id = t.id
+        WHERE bc.customer_id = ?
+        ORDER BY b.booking_date DESC
+        "#
+    )
+    .bind(customer_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch customer properties: {}", e))?;
+
+    let mut properties = Vec::new();
+    let mut grand_total_agreed = 0.0;
+    let mut grand_total_paid = 0.0;
+
+    for row in b_rows {
+        let agreed_sale_value: f64 = row.get("agreed_sale_value");
+        let total_paid: f64 = row.get("total_paid");
+        let outstanding_balance = agreed_sale_value - total_paid;
+
+        grand_total_agreed += agreed_sale_value;
+        grand_total_paid += total_paid;
+
+        let booking_id: i64 = row.get("booking_id");
+        
+        let receipt_rows = sqlx::query(
+            "SELECT 
+                id, receipt_number, amount, payment_mode, transaction_ref, 
+                date, status, void_reason, 
+                gst_amount, gst_basis, gst_rate, taxable_value, tds_amount 
+             FROM receipts 
+             WHERE booking_id = ? 
+             ORDER BY id ASC"
+        )
+        .bind(booking_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let mut receipts = Vec::new();
+        for r_row in receipt_rows {
+            // 2. Add the missing fields to the struct initializer
+            receipts.push(ReceiptItem {
+                id: r_row.get("id"),
+                receipt_number: r_row.get("receipt_number"),
+                amount: r_row.get("amount"),
+                payment_mode: r_row.get("payment_mode"),
+                transaction_ref: r_row.get("transaction_ref"),
+                date: r_row.get("date"),
+                status: r_row.get("status"),
+                void_reason: r_row.get("void_reason"),
+                gst_amount: r_row.get("gst_amount"),
+                gst_basis: r_row.get("gst_basis"),
+                gst_rate: r_row.get("gst_rate"),
+                taxable_value: r_row.get("taxable_value"),
+                tds_amount: r_row.get("tds_amount"),
+            });
+        }
+
+        properties.push(CustomerPropertySummary {
+            booking_id,
+            unit_number: row.get("unit_number"),
+            project_name: row.get("project_name"),
+            tower_name: row.get("tower_name"),
+            agreed_sale_value,
+            total_paid,
+            outstanding_balance,
+            role: row.get("role"),
+            receipts,
+        });
+    }
+
+    Ok(CustomerProfile {
+        customer,
+        properties,
+        grand_total_agreed,
+        grand_total_paid,
+        grand_total_outstanding: grand_total_agreed - grand_total_paid,
+    })
+}
+
+// ─── Tier 3 Payment Schedule & GST / TDS Logic ──────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GstBreakdown {
+    pub gst_rate: f64,
+    pub gst_amount: f64,
+    pub taxable_value: f64,
+    pub tds_amount: f64,
+    pub gst_basis: String,
+}
+
+pub fn calculate_gst_and_tds(
+    agreed_sale_value: f64,
+    receipt_amount: f64,
+    carpet_area_sqm: f64,
+    is_metro: bool,
+    oc_date: Option<&str>,
+    receipt_date: &str,
+) -> GstBreakdown {
+    if let Some(oc) = oc_date {
+        if !oc.trim().is_empty() && oc <= receipt_date {
+            return GstBreakdown {
+                gst_rate: 0.0,
+                gst_amount: 0.0,
+                taxable_value: receipt_amount,
+                tds_amount: if agreed_sale_value >= 5_000_000.0 { receipt_amount * 0.01 } else { 0.0 },
+                gst_basis: format!("Exempt (Occupancy Certificate Issued on {})", oc),
+            };
+        }
+    }
+
+    let taxable_value = receipt_amount * (2.0 / 3.0);
+    let max_area = if is_metro { 60.0 } else { 90.0 };
+    let is_affordable = agreed_sale_value <= 4_500_000.0 && carpet_area_sqm > 0.0 && carpet_area_sqm <= max_area;
+
+    let (gst_rate, gst_basis) = if is_affordable {
+        (1.0, format!("1% GST (Affordable Housing: Price ≤ ₹45L & Area ≤ {} sqm)", max_area))
+    } else {
+        (5.0, "5% GST (Standard Under-Construction Rate)".to_string())
+    };
+
+    let gst_amount = taxable_value * (gst_rate / 100.0);
+    let tds_amount = if agreed_sale_value >= 5_000_000.0 { receipt_amount * 0.01 } else { 0.0 };
+
+    GstBreakdown {
+        gst_rate,
+        gst_amount,
+        taxable_value,
+        tds_amount,
+        gst_basis,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaymentScheduleItem {
+    pub id: i64,
+    pub booking_id: i64,
+    pub milestone_name: String,
+    pub due_date: Option<String>,
+    pub percentage: f64,
+    pub due_amount: f64,
+    pub status: String,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PaymentMilestoneInput {
+    pub milestone_name: String,
+    pub due_date: Option<String>,
+    pub percentage: f64,
+    pub due_amount: f64,
+}
+
+#[tauri::command]
+pub async fn create_payment_schedule(
+    booking_id: i64,
+    milestones: Vec<PaymentMilestoneInput>,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
+    let pool = &state.pool;
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    sqlx::query("DELETE FROM payment_schedules WHERE booking_id = ? AND status = 'Pending'")
+        .bind(booking_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to clear existing schedule: {}", e))?;
+
+    for m in milestones {
+        sqlx::query(
+            r#"
+            INSERT INTO payment_schedules (booking_id, milestone_name, due_date, percentage, due_amount, status)
+            VALUES (?, ?, ?, ?, ?, 'Pending')
+            "#
+        )
+        .bind(booking_id)
+        .bind(&m.milestone_name)
+        .bind(&m.due_date)
+        .bind(m.percentage)
+        .bind(m.due_amount)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert milestone: {}", e))?;
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_payment_schedule(
+    booking_id: i64,
+    state: State<'_, DbState>,
+) -> Result<Vec<PaymentScheduleItem>, String> {
+    let pool = &state.pool;
+    let rows = sqlx::query(
+        r#"
+        SELECT id, booking_id, milestone_name, due_date, percentage, due_amount, status, created_at, updated_at
+        FROM payment_schedules
+        WHERE booking_id = ?
+        ORDER BY id ASC
+        "#
+    )
+    .bind(booking_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch payment schedule: {}", e))?;
+
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(PaymentScheduleItem {
+            id: row.get("id"),
+            booking_id: row.get("booking_id"),
+            milestone_name: row.get("milestone_name"),
+            due_date: row.get("due_date"),
+            percentage: row.get("percentage"),
+            due_amount: row.get("due_amount"),
+            status: row.get("status"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        });
+    }
+
+    Ok(items)
+}
+
+#[tauri::command]
+pub async fn update_milestone_status(
+    milestone_id: i64,
+    status: String,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
+    let pool = &state.pool;
+    if !["Pending", "Partially Paid", "Paid", "Overdue"].contains(&status.as_str()) {
+        return Err("Invalid milestone status".to_string());
+    }
+
+    sqlx::query("UPDATE payment_schedules SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(&status)
+        .bind(milestone_id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to update milestone: {}", e))?;
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectRevenueSummary {
+    pub project_id: i64,
+    pub project_name: String,
+    pub total_units: i64,
+    pub booked_units: i64,
+    pub total_agreed_value: f64,
+    pub total_collected: f64,
+    pub total_outstanding: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FinancialDashboardStats {
+    pub total_revenue: f64,
+    pub total_collected: f64,
+    pub total_outstanding: f64,
+    pub overdue_amount: f64,
+    pub total_units: i64,
+    pub booked_units: i64,
+    pub available_units: i64,
+    pub registered_units: i64,
+    pub project_summaries: Vec<ProjectRevenueSummary>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OverdueMilestoneReport {
+    pub milestone_id: i64,
+    pub booking_id: i64,
+    pub milestone_name: String,
+    pub due_date: String,
+    pub due_amount: f64,
+    pub status: String,
+    pub customer_name: String,
+    pub customer_phone: String,
+    pub unit_number: String,
+    pub project_name: String,
+}
+
+#[tauri::command]
+pub async fn get_financial_dashboard_stats(
+    state: State<'_, DbState>,
+) -> Result<FinancialDashboardStats, String> {
+    let pool = &state.pool;
+
+    let total_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units").fetch_one(pool).await.unwrap_or(0);
+    let booked_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units WHERE status = 'Booked'").fetch_one(pool).await.unwrap_or(0);
+    let available_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units WHERE status = 'Available'").fetch_one(pool).await.unwrap_or(0);
+    let registered_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units WHERE status = 'Registered'").fetch_one(pool).await.unwrap_or(0);
+
+    let total_revenue: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(agreed_sale_value), 0.0) FROM bookings").fetch_one(pool).await.unwrap_or(0.0);
+    let total_collected: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0.0) FROM receipts WHERE status = 'Active'").fetch_one(pool).await.unwrap_or(0.0);
+    let total_outstanding = total_revenue - total_collected;
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let overdue_amount: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(due_amount), 0.0) FROM payment_schedules WHERE status != 'Paid' AND due_date IS NOT NULL AND due_date < ?"
+    )
+    .bind(&today)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0.0);
+
+    let p_rows = sqlx::query("SELECT id, name FROM projects ORDER BY name").fetch_all(pool).await.unwrap_or_default();
+    let mut project_summaries = Vec::new();
+
+    for p_row in p_rows {
+        let p_id: i64 = p_row.get("id");
+        let p_name: String = p_row.get("name");
+
+        let p_total_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units WHERE project_id = ?").bind(p_id).fetch_one(pool).await.unwrap_or(0);
+        let p_booked_units: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM units WHERE project_id = ? AND status IN ('Booked','Registered')").bind(p_id).fetch_one(pool).await.unwrap_or(0);
+
+        let p_agreed_val: f64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(b.agreed_sale_value), 0.0) FROM bookings b JOIN units u ON b.unit_id = u.id WHERE u.project_id = ?"
+        ).bind(p_id).fetch_one(pool).await.unwrap_or(0.0);
+
+        let p_collected_val: f64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(r.amount), 0.0) FROM receipts r JOIN bookings b ON r.booking_id = b.id JOIN units u ON b.unit_id = u.id WHERE u.project_id = ? AND r.status = 'Active'"
+        ).bind(p_id).fetch_one(pool).await.unwrap_or(0.0);
+
+        project_summaries.push(ProjectRevenueSummary {
+            project_id: p_id,
+            project_name: p_name,
+            total_units: p_total_units,
+            booked_units: p_booked_units,
+            total_agreed_value: p_agreed_val,
+            total_collected: p_collected_val,
+            total_outstanding: p_agreed_val - p_collected_val,
+        });
+    }
+
+    Ok(FinancialDashboardStats {
+        total_revenue,
+        total_collected,
+        total_outstanding,
+        overdue_amount,
+        total_units,
+        booked_units,
+        available_units,
+        registered_units,
+        project_summaries,
+    })
+}
+
+#[tauri::command]
+pub async fn get_overdue_milestones_report(
+    state: State<'_, DbState>,
+) -> Result<Vec<OverdueMilestoneReport>, String> {
+    let pool = &state.pool;
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            ps.id as milestone_id,
+            ps.booking_id,
+            ps.milestone_name,
+            ps.due_date,
+            ps.due_amount,
+            ps.status,
+            c.name as customer_name,
+            c.phone as customer_phone,
+            u.unit_number,
+            p.name as project_name
+        FROM payment_schedules ps
+        JOIN bookings b ON ps.booking_id = b.id
+        JOIN booking_customers bc ON bc.booking_id = b.id AND bc.role = 'Primary'
+        JOIN customers c ON bc.customer_id = c.id
+        JOIN units u ON b.unit_id = u.id
+        JOIN projects p ON u.project_id = p.id
+        WHERE ps.status != 'Paid' AND ps.due_date IS NOT NULL AND ps.due_date < ?
+        ORDER BY ps.due_date ASC
+        "#
+    )
+    .bind(&today)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to query overdue report: {}", e))?;
+
+    let mut report = Vec::new();
+    for row in rows {
+        report.push(OverdueMilestoneReport {
+            milestone_id: row.get("milestone_id"),
+            booking_id: row.get("booking_id"),
+            milestone_name: row.get("milestone_name"),
+            due_date: row.get("due_date"),
+            due_amount: row.get("due_amount"),
+            status: row.get("status"),
+            customer_name: row.get("customer_name"),
+            customer_phone: row.get("customer_phone"),
+            unit_number: row.get("unit_number"),
+            project_name: row.get("project_name"),
+        });
+    }
+
+    Ok(report)
 }

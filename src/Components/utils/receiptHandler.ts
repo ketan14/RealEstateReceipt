@@ -6,14 +6,14 @@ import { ReceiptHistoryItem } from "../../types";
 
 // (window.print() is NOT supported inside Tauri's WKWebView on macOS)
 export const printReceipt = async (item: ReceiptHistoryItem) => {
-    try {
-        const html = buildReceiptHtml(item);
-        const filename = `receipt_${item.receipt_number}`;
-        await invoke("open_receipt_html", { html, filename });
-    } catch (err: any) {
-        console.error("Print failed:", err);
-        throw new Error(`Failed to open receipt: ${err.message || err}`);
-    }
+  try {
+    const html = buildReceiptHtml(item);
+    const filename = `receipt_${item.receipt_number}`;
+    await invoke("generate_and_open_pdf", { html, filename });
+  } catch (err: any) {
+    console.error("Print failed:", err);
+    throw new Error(`Failed to open receipt: ${err.message || err}`);
+  }
 };
 
 /**

@@ -12,6 +12,8 @@ import { ReceiptLedgerView } from "./Components/Dashboard/ledger/ReceiptLedgerVi
 import { BookingModal } from "./Components/Models/BookingModal";
 import { BookingDetailsModal } from "./Components/Models/BookingDetailsModal";
 import { LockScreen } from "./Components/Auth/LockScreen";
+import { CustomerDirectory } from "./Components/Dashboard/Customers/CustomerDirectory";
+import { ReportsTab } from "./Components/Dashboard/ReportsTab";
 
 function App() {
   // Authentication State
@@ -51,7 +53,7 @@ function App() {
 
   // Navigation & View State
 
-  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin">("explorer");
+  const [activeTab, setActiveTab] = useState<"explorer" | "history" | "admin" | "customers" | "reports">("explorer");
   //const [projects, setProjects] = useState<Project[]>([]);
   //const [receipts, setReceipts] = useState<ReceiptHistoryItem[]>([]);
   const [uniqueCombinations, setUniqueCombinations] = useState<ReceiptHistoryItem[]>([]);
@@ -77,8 +79,13 @@ function App() {
   const errorMsgState = useAppStore((state) => state.errorMsg);
   // Load Data 
   useEffect(() => {
+    console.log('load data Called once in App.tsx')
     loadData();
   }, [loadData]);
+  useEffect(() => {
+    console.log('projects Called once in App.tsx')
+  }, [projects]);
+
   useEffect(() => {
     setErrorMsg(errorMsgState);
   }, [errorMsgState]);
@@ -92,12 +99,6 @@ function App() {
     );
     setUniqueCombinations(uniqueCombinations);
   }, [receipts]);
-
-  useEffect(() => {
-    console.log("Unique combinations:", uniqueCombinations);
-  }, [uniqueCombinations]);
-  useEffect(() => {
-  }, [projects])
 
   // Handle unit selection
   const selectUnitForBooking = async (unit: Unit) => {
@@ -116,7 +117,6 @@ function App() {
       try {
         //setLoading(true);
         const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: unit.id });
-        debugger;
         console.timeLog('details', details)
         setBookingDetails(details);
         setIsDetailsOpen(true);
@@ -193,9 +193,18 @@ function App() {
         {/* Tab 3: Admin */}
         {
           activeTab === "admin" && !loading && (
-            <AdminDashboard projectsRef={projects} />
+            <AdminDashboard projectsRef={projects} loadData={loadData} />
           )
         }
+        {/* Tab 4: Customers */}
+        {
+          activeTab === "customers" && !loading && (
+            <CustomerDirectory />
+          )
+        }
+        {activeTab === "reports" && !loading && (
+          <ReportsTab />
+        )}
       </main >
       {/* Booking Form Modal Overlay */}
 

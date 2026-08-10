@@ -27,6 +27,33 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
       `
     : '';
 
+  const gstRate = r.gst_rate ?? 0;
+  const gstAmount = r.gst_amount ?? 0;
+  const taxableVal = r.taxable_value ?? r.amount;
+  const tdsAmt = r.tds_amount ?? 0;
+  const gstBasis = r.gst_basis || (gstRate > 0 ? `${gstRate}% GST Applicable` : "Exempt");
+
+  const cgstAmount = gstAmount / 2;
+  const sgstAmount = gstAmount / 2;
+
+  const taxBreakdownHtml = `
+    <div class="pay-table-wrap" style="margin-top: 18px;">
+      <div class="pay-table-head" style="background: #0f766e;">Statutory Tax Invoice Breakdown (GST & TDS)</div>
+      <table>
+        <tr><td class="td-label">Total Payment Amount</td><td class="td-value">&#8377;${r.amount.toLocaleString("en-IN")}</td></tr>
+        <tr><td class="td-label">Statutory Land Deduction (1/3rd Abatement)</td><td class="td-value">- &#8377;${(r.amount - taxableVal).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
+        <tr><td class="td-label">Taxable Base Value</td><td class="td-value">&#8377;${taxableVal.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
+        <tr><td class="td-label">CGST (${(gstRate / 2).toFixed(1)}%)</td><td class="td-value">&#8377;${cgstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
+        <tr><td class="td-label">SGST / UTGST (${(gstRate / 2).toFixed(1)}%)</td><td class="td-value">&#8377;${sgstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
+        <tr class="highlight" style="background: #f0fdf4; color: #166534;"><td class="td-label">Total GST Charged</td><td class="td-value">&#8377;${gstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
+        ${tdsAmt > 0 ? `<tr><td class="td-label" style="color: #991b1b; font-weight: 600;">Statutory TDS (Sec 194-IA 1% - Buyer Deposit)</td><td class="td-value" style="color: #991b1b;">&#8377;${tdsAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>` : ''}
+      </table>
+      <div style="padding: 8px 18px; font-size: 10px; color: #4b5563; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+        <strong>Tax Computation Basis:</strong> ${gstBasis}
+      </div>
+    </div>
+  `;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,6 +74,10 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
       body { padding: 0; }
       @page { margin: 0.5in; size: A4 portrait; }
       .no-print { display: none !important; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
     .print-btn {
       display: flex;
@@ -223,6 +254,9 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
     </table>
   </div>
 
+  <!-- Tax Breakdown -->
+  ${taxBreakdownHtml}
+
   <!-- Amount Banner -->
   <div class="amount-banner">
     <div>
@@ -237,9 +271,9 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
 
   <!-- Footer -->
   <div class="footer">
-    <strong>Note:</strong> This is a computer-generated receipt and does not require a physical signature.
+    <strong>Note:</strong> This is a computer-generated tax receipt and does not require a physical signature.
     This receipt is valid subject to realization of payment. For queries, contact the sales office with this receipt number.<br/>
-    <strong>Aether RealEstate ERP</strong> &mdash; Confidential Document
+    <strong>Aether RealEstate ERP</strong> &mdash; Statutory Tax Invoice Document
   </div>
 </body>
 </html>`;

@@ -65,6 +65,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
             // 2. Now get() is defined, so you can call loadData() directly from the store
             await get().loadData();
+            await get().projects;
         } catch (err: any) {
             console.error(err);
             set({

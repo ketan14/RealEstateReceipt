@@ -9,9 +9,10 @@ interface ProjectDetailProps {
   projectId: number;
   projectsRef: Project[];
   onBack: () => void; // <-- add this
+  loadData: () => Promise<void>;
 }
 
-export default function ProjectDetail({ projectId, projectsRef, onBack }: ProjectDetailProps) {
+export default function ProjectDetail({ projectId, projectsRef, onBack, loadData }: ProjectDetailProps) {
   const [project, setProject] = useState<{ id: number; name: string; location: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"towers" | "units">("towers");
 
@@ -19,8 +20,6 @@ export default function ProjectDetail({ projectId, projectsRef, onBack }: Projec
     async function loadProject() {
       const projects = await getProjects();
       const found = projects.find((p) => p.id === projectId);
-      console.log("found", found)
-      console.log("projectsRef", projectsRef)
       setProject(found || null);
     }
     loadProject();
@@ -72,8 +71,8 @@ export default function ProjectDetail({ projectId, projectsRef, onBack }: Projec
 
       {/* Tab content */}
       <div className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col p-6">
-        {activeTab === "towers" && <AdminTowers projectId={project.id} />}
-        {activeTab === "units" && <AdminUnits projectId={project.id} towersRef={projectsRef.find((p) => p.id === projectId)?.towers || []} />}
+        {activeTab === "towers" && <AdminTowers projectId={project.id} loadData={loadData} />}
+        {activeTab === "units" && <AdminUnits projectId={project.id} towersRef={projectsRef.find((p) => p.id === projectId)?.towers || []} loadData={loadData} />}
       </div>
     </div>
   );
