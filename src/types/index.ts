@@ -7,6 +7,8 @@ export interface Unit {
   base_price: number;
   configuration: string;
   carpet_area_sqm?: number;
+  projectName?: string;
+  towerName?: string;
 }
 
 export interface UnitCSVRow {
@@ -116,6 +118,9 @@ export interface BookingDetails {
   customer_pan: string;
   customer_aadhaar: string;
   agreed_sale_value: number;
+  total_gst_liability: number;
+  total_contract_value: number;
+  gst_basis: string;
   booking_date: string;
   unit_id: number;
   receipts: ReceiptItem[];

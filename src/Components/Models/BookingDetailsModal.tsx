@@ -69,39 +69,39 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
             setSuccessMsgFromModal(`Part payment recorded successfully! Receipt generated: ${receiptNo}`);
             setShowPartPaymentForm(false);
 
-            // Trigger automatic printing of the newly created receipt
-            const matchedProj = projects.find((p) => p.id === selectedUnit.project_id);
-            const matchedTower = matchedProj?.towers.find((t) => t.id === selectedUnit.tower_id);
-            const newReceiptItem: ReceiptHistoryItem = {
-                receipt_id: Date.now(), // dummy temporary id for printing
-                receipt_number: receiptNo,
-                amount: amountVal,
-                payment_mode: partPaymentMode,
-                transaction_ref: partPaymentMode === "Cash" ? "CASH-PAY" : partTransactionRef.trim(),
-                date: partPaymentDate,
-                booking_id: bookingDetails.id,
-                agreed_sale_value: bookingDetails.agreed_sale_value,
-                booking_date: bookingDetails.booking_date,
-                customer_name: bookingDetails.customer_name,
-                customer_phone: bookingDetails.customer_phone,
-                customer_pan: bookingDetails.customer_pan,
-                customer_aadhaar: bookingDetails.customer_aadhaar,
-                unit_number: selectedUnit.unit_number,
-                project_name: matchedProj?.name || "",
-                tower_name: matchedTower?.name || "",
-                rera_number: matchedProj?.rera_number || null,
-                co_applicants: bookingDetails.co_applicants,
-                status: selectedUnit.status,
-            };
-
             // Reload dataset
             await loadData();
 
             // Reload booking details
             const details: BookingDetails | null = await invoke("get_booking_details_by_unit", { unitId: selectedUnit.id });
             setBookingDetailsFromModal(details);
-            // Print
-            printReceipt(newReceiptItem);
+
+            // Print actual receipt from DB
+            if (details) {
+                const actualReceipt = details.receipts.find(r => r.receipt_number === receiptNo);
+                if (actualReceipt) {
+                    const matchedProj = projects.find((p) => p.id === selectedUnit.project_id);
+                    const matchedTower = matchedProj?.towers.find((t) => t.id === selectedUnit.tower_id);
+                    const itemToPrint: ReceiptHistoryItem = {
+                        ...actualReceipt,
+                        receipt_id: actualReceipt.id,
+                        booking_id: details.id,
+                        agreed_sale_value: details.agreed_sale_value,
+                        booking_date: details.booking_date,
+                        customer_name: details.customer_name,
+                        customer_phone: details.customer_phone,
+                        customer_pan: details.customer_pan,
+                        customer_aadhaar: details.customer_aadhaar,
+                        unit_number: selectedUnit.unit_number,
+                        project_name: matchedProj?.name || "",
+                        tower_name: matchedTower?.name || "",
+                        rera_number: matchedProj?.rera_number || null,
+                        co_applicants: details.co_applicants,
+                        status: selectedUnit.status,
+                    };
+                    printReceipt(itemToPrint);
+                }
+            }
         } catch (err: any) {
             console.error(err);
             setErrorMsgFromModal(err.toString() || "Transaction failed.");
@@ -216,12 +216,8 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                                         const matchedProj = projects.find((p) => p.id === selectedUnit.project_id);
                                         const matchedTower = matchedProj?.towers.find((t) => t.id === selectedUnit.tower_id);
                                         const item: ReceiptHistoryItem = {
+                                            ...rec,
                                             receipt_id: rec.id,
-                                            receipt_number: rec.receipt_number,
-                                            amount: rec.amount,
-                                            payment_mode: rec.payment_mode,
-                                            transaction_ref: rec.transaction_ref,
-                                            date: rec.date,
                                             booking_id: bookingDetails.id,
                                             agreed_sale_value: bookingDetails.agreed_sale_value,
                                             booking_date: bookingDetails.booking_date,
@@ -278,50 +274,89 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                         {/* Financial Summary & Visualization */}
                         {(() => {
                             const totalPaid = bookingDetails.receipts.reduce((acc, r) => acc + r.amount, 0);
-                            const outstanding = bookingDetails.agreed_sale_value - totalPaid;
+                            const totalGstPaid = bookingDetails.receipts.reduce((acc, r) => acc + (r.gst_amount ?? 0), 0);
+                            const totalFlatPaid = totalPaid - totalGstPaid;
 
-                            // Compute percentages
-                            const paidPercentage = Math.min((totalPaid / bookingDetails.agreed_sale_value) * 100, 100);
+                            const flatValue = bookingDetails.agreed_sale_value;
+                            const gstLiability = bookingDetails.total_gst_liability || 0;
+                            const totalContractValue = bookingDetails.total_contract_value || flatValue;
+
+                            const outstandingFlat = Math.max(0, flatValue - totalFlatPaid);
+                            const outstandingGst = Math.max(0, gstLiability - totalGstPaid);
+                            const totalOutstanding = outstandingFlat + outstandingGst;
 
                             // Compute preview percentage
                             const parsedPartAmount = parseFloat(partAmount);
-                            const validPartAmount = !isNaN(parsedPartAmount) && parsedPartAmount > 0 && parsedPartAmount <= outstanding + 0.01;
+                            const validPartAmount = !isNaN(parsedPartAmount) && parsedPartAmount > 0 && parsedPartAmount <= totalOutstanding + 0.01;
                             const previewAmount = validPartAmount ? parsedPartAmount : 0;
-                            const previewPercentage = Math.min((previewAmount / bookingDetails.agreed_sale_value) * 100, 100 - paidPercentage);
+
+                            const paidPercentage = Math.min((totalPaid / totalContractValue) * 100, 100);
+                            const previewPercentage = Math.min((previewAmount / totalContractValue) * 100, 100 - paidPercentage);
                             const pendingPercentage = Math.max(0, 100 - paidPercentage - previewPercentage);
 
                             return (
                                 <div className="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4 shadow-md">
-                                    <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-1">Payment Ledger</div>
+                                    <div className="flex justify-between items-center border-b border-slate-800 pb-1">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-indigo-400">Payment Ledger & Summary</div>
+                                        <div className="text-[10px] text-slate-500 font-medium">{bookingDetails.gst_basis || "Exempt"}</div>
+                                    </div>
 
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400">Agreed Sale Value</span>
-                                            <span className="font-bold text-slate-200 text-sm">₹{bookingDetails.agreed_sale_value.toLocaleString("en-IN")}</span>
+                                    <div className="space-y-1.5 text-xs font-mono">
+                                        <div className="flex justify-between text-slate-400">
+                                            <span>Flat Value</span>
+                                            <span>₹{flatValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400">Total Already Paid</span>
-                                            <span className="font-bold text-emerald-400 text-sm">₹{totalPaid.toLocaleString("en-IN")} ({paidPercentage.toFixed(1)}%)</span>
+                                        <div className="flex justify-between text-slate-400">
+                                            <span>GST Liability</span>
+                                            <span>₹{gstLiability.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
                                         </div>
+                                        <div className="flex justify-between text-slate-400">
+                                            <span>Other Charges</span>
+                                            <span>₹0</span>
+                                        </div>
+                                        <div className="flex justify-between text-slate-200 font-bold border-t border-slate-800/60 pt-1.5 pb-2">
+                                            <span>Total Contract Value</span>
+                                            <span>₹{totalContractValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                        </div>
+
+                                        <div className="flex justify-between text-emerald-400/80">
+                                            <span>Paid Towards Flat</span>
+                                            <span>₹{totalFlatPaid.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div className="flex justify-between text-emerald-400/80">
+                                            <span>GST Already Paid</span>
+                                            <span>₹{totalGstPaid.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                        </div>
+
                                         {previewAmount > 0 && (
-                                            <div className="flex justify-between text-indigo-400 font-semibold animate-pulse">
+                                            <div className="flex justify-between text-indigo-400 font-semibold animate-pulse border-t border-slate-800/60 pt-1.5 mt-1">
                                                 <span>New Payment Preview</span>
-                                                <span>+₹{previewAmount.toLocaleString("en-IN")} ({((previewAmount / bookingDetails.agreed_sale_value) * 100).toFixed(1)}%)</span>
+                                                <span>+₹{previewAmount.toLocaleString("en-IN")}</span>
                                             </div>
                                         )}
-                                        <div className="flex justify-between border-t border-slate-800/80 pt-2 text-slate-300">
-                                            <span>Outstanding Balance</span>
-                                            <span className={`font-bold text-sm ${outstanding - previewAmount > 0.01 ? "text-amber-400" : "text-emerald-500"}`}>
-                                                ₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")}
+
+                                        <div className="flex justify-between text-amber-400/80 border-t border-slate-800/60 pt-1.5 mt-1">
+                                            <span>Outstanding Flat Value</span>
+                                            <span>₹{outstandingFlat.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div className="flex justify-between text-amber-400/80">
+                                            <span>Outstanding GST</span>
+                                            <span>₹{outstandingGst.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                        </div>
+
+                                        <div className="flex justify-between font-bold border-t border-slate-800/60 pt-1.5 mt-1">
+                                            <span className="text-slate-300">Total Outstanding</span>
+                                            <span className={`text-sm ${totalOutstanding - previewAmount > 0.01 ? "text-amber-400" : "text-emerald-500"}`}>
+                                                ₹{Math.max(0, totalOutstanding - previewAmount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Colored Segmented Progress Bar */}
-                                    <div className="space-y-2 pt-2">
+                                    <div className="space-y-2 pt-3 border-t border-slate-800/60">
                                         <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
                                             <span>PAYMENT PROGRESS</span>
-                                            <span>{((totalPaid + previewAmount) / bookingDetails.agreed_sale_value * 100).toFixed(1)}%</span>
+                                            <span>{((totalPaid + previewAmount) / totalContractValue * 100).toFixed(1)}%</span>
                                         </div>
 
                                         {/* Bar Track */}
@@ -368,7 +403,7 @@ export const BookingDetailsModal = ({ isOpen, bookingDetails, selectedUnit, proj
                                             )}
                                             <div className="flex items-center gap-1">
                                                 <span className="w-2.5 h-2.5 rounded bg-slate-800 block"></span>
-                                                <span>Pending (₹{Math.max(0, outstanding - previewAmount).toLocaleString("en-IN")})</span>
+                                                <span>Pending (₹{Math.max(0, totalOutstanding - previewAmount).toLocaleString("en-IN")})</span>
                                             </div>
                                         </div>
                                     </div>

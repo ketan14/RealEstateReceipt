@@ -98,7 +98,12 @@ export const BookingModal = ({ isOpen, selectedUnit, onClose, setSuccessMessageF
                 <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
                     <div>
                         <h3 className="text-base font-bold text-slate-200">Generate Booking & Receipt</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Unit {selectedUnit.unit_number} • {selectedUnit.configuration}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            {selectedUnit.projectName} • {selectedUnit.towerName} • Unit {selectedUnit.unit_number}
+                            <span className="text-slate-500"> • </span>
+                            {selectedUnit.configuration}
+                        </p>
+
                     </div>
                     <button
                         onClick={() => {

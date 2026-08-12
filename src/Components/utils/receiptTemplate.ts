@@ -32,11 +32,38 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
   const taxableVal = r.taxable_value ?? r.amount;
   const tdsAmt = r.tds_amount ?? 0;
   const gstBasis = r.gst_basis || (gstRate > 0 ? `${gstRate}% GST Applicable` : "Exempt");
+  const isGstExempt = gstRate === 0;
 
   const cgstAmount = gstAmount / 2;
   const sgstAmount = gstAmount / 2;
 
-  const taxBreakdownHtml = `
+  // TDS row — shown in both exempt and non-exempt cases when applicable
+  const tdsRowHtml = tdsAmt > 0
+    ? `<tr><td class="td-label" style="color: #991b1b; font-weight: 600;">Statutory TDS (Sec 194-IA 1% — Buyer Deposit)</td><td class="td-value" style="color: #991b1b;">&#8377;${tdsAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>`
+    : '';
+
+  const taxBreakdownHtml = isGstExempt
+    ? `
+    <div class="pay-table-wrap" style="margin-top: 18px;">
+      <div class="pay-table-head" style="background: #065f46;">Post-Possession Sale — GST Exempt</div>
+      <div style="padding: 14px 18px; background: #ecfdf5; border-bottom: 1px solid #a7f3d0;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 18px;">✅</span>
+          <strong style="font-size: 13px; color: #065f46;">No GST Applicable on this Transaction</strong>
+        </div>
+        <p style="font-size: 11px; color: #047857; margin: 0; line-height: 1.6;">
+          This unit has received its <strong>Occupancy / Completion Certificate</strong>. As per GST law,
+          the sale of a completed property (post-OC/CC) is treated as a sale of immovable property
+          and is <strong>exempt from GST</strong>. No land deduction or GST computation applies.
+        </p>
+      </div>
+      ${tdsRowHtml ? `<table>${tdsRowHtml}</table>` : ''}
+      <div style="padding: 8px 18px; font-size: 10px; color: #4b5563; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+        <strong>Status:</strong> ${gstBasis}
+      </div>
+    </div>
+    `
+    : `
     <div class="pay-table-wrap" style="margin-top: 18px;">
       <div class="pay-table-head" style="background: #0f766e;">Statutory Tax Invoice Breakdown (GST & TDS)</div>
       <table>
@@ -46,7 +73,7 @@ export const buildReceiptHtml = (r: ReceiptHistoryItem): string => {
         <tr><td class="td-label">CGST (${(gstRate / 2).toFixed(1)}%)</td><td class="td-value">&#8377;${cgstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
         <tr><td class="td-label">SGST / UTGST (${(gstRate / 2).toFixed(1)}%)</td><td class="td-value">&#8377;${sgstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
         <tr class="highlight" style="background: #f0fdf4; color: #166534;"><td class="td-label">Total GST Charged</td><td class="td-value">&#8377;${gstAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>
-        ${tdsAmt > 0 ? `<tr><td class="td-label" style="color: #991b1b; font-weight: 600;">Statutory TDS (Sec 194-IA 1% - Buyer Deposit)</td><td class="td-value" style="color: #991b1b;">&#8377;${tdsAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td></tr>` : ''}
+        ${tdsRowHtml}
       </table>
       <div style="padding: 8px 18px; font-size: 10px; color: #4b5563; background: #f9fafb; border-top: 1px solid #e5e7eb;">
         <strong>Tax Computation Basis:</strong> ${gstBasis}

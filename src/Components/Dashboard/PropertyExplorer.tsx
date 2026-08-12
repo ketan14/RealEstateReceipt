@@ -216,7 +216,14 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                             return (
                               <button
                                 key={unit.id}
-                                onClick={() => selectUnitForBooking(unit)}
+                                onClick={() =>
+                                  selectUnitForBooking({
+                                    ...unit,
+                                    projectName: project.name,
+                                    towerName: tower.name,
+                                  })
+                                }
+
                                 className={`flex-1 min-w-[200px] max-w-[250px] rounded-xl bg-slate-900 border border-slate-700 shadow-md p-4 flex flex-col justify-between transition-all duration-200 transform hover:-translate-y-0.5 active:scale-95 ${statusStyles} ${isSelected ? 'ring-2 ring-indigo-500 scale-102 border-indigo-400 shadow-md shadow-indigo-500/10' : ''
                                   }`}
                               >

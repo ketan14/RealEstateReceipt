@@ -12,6 +12,14 @@ export default function AdminProjects({ projectsRef, loadData }: { projectsRef: 
   const [reraWebsiteUrl, setReraWebsiteUrl] = useState("");
   const [isMetro, setIsMetro] = useState(false);
   const [ocDate, setOcDate] = useState("");
+
+  const metroCities = ['Bengaluru', 'Chennai', 'Delhi NCR', 'Hyderabad', 'Kolkata', 'Mumbai'];
+
+  function handleLocationChange(val: string) {
+    setLocation(val);
+    const isMetroCity = metroCities.some(city => val.toLowerCase().includes(city.toLowerCase()));
+    setIsMetro(isMetroCity);
+  }
   const [showModalForAdmin, setShowModalForAdmin] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -162,7 +170,7 @@ export default function AdminProjects({ projectsRef, loadData }: { projectsRef: 
                 <h3 className="text-lg font-semibold text-slate-200">Add New Project</h3>
                 <div className="space-y-3">
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project Name" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
+                  <input value={location} onChange={(e) => handleLocationChange(e.target.value)} placeholder="Location" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
                   <input value={reraNumber} onChange={(e) => setReraNumber(e.target.value)} placeholder="RERA Number (Optional)" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
                   <input value={reraWebsiteUrl} onChange={(e) => setReraWebsiteUrl(e.target.value)} placeholder="RERA Website URL (Optional)" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
 
@@ -204,7 +212,7 @@ export default function AdminProjects({ projectsRef, loadData }: { projectsRef: 
                 <h3 className="text-lg font-semibold text-slate-200">Update Project</h3>
                 <div className="space-y-3">
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project Name" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
+                  <input value={location} onChange={(e) => handleLocationChange(e.target.value)} placeholder="Location" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
                   <input value={reraNumber} onChange={(e) => setReraNumber(e.target.value)} placeholder="RERA Number (Optional)" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
                   <input value={reraWebsiteUrl} onChange={(e) => setReraWebsiteUrl(e.target.value)} placeholder="RERA Website URL (Optional)" className="w-full p-2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-sm" />
 
